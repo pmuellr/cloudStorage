@@ -1,0 +1,27 @@
+{
+  "name":               "cloudStorage",
+  "main":               "./lib/cloudStorage",
+  "description":        "browser and server persistance modelled after window.localStorage",
+  "author":             "pmuellr",
+  "version":            "0.1.0",
+  "licenses":           [{ "type": "Apache License" }],
+  "homepage":           "https://github.com/pmuellr/cloudStorage",
+  "bugs":               "https://github.com/pmuellr/cloudStorage/issues",
+  "repository":         {"type": "git", "url": "git://github.com/pmuellr/cloudStorage" },
+  "dependencies":
+    {
+      "express":              "3.4.x",
+      "nopt":                 "2.1.x",
+      "underscore":           "1.5.x"
+    },
+  "devDependencies":
+    {
+      "browserify":           "2.35.x",
+      "coffee-script":        "1.6.x",
+      "expect.js":            "0.2.x",
+      "grunt":                "0.4.x",
+      "grunt-contrib-watch":  "0.5.x",
+      "mocha":                "1.14.x",
+      "shelljs":              "0.2.x"
+    }
+}
