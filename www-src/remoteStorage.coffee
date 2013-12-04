@@ -1,55 +1,194 @@
 # Licensed under the Apache License. See footer for details.
 
-url   = require "url"
+URL   = require "url"
+path  = require "path"
 http  = require "http"
 https = require "https"
 
-_ = require "underscore"
+_       = require "underscore"
+cookies = require "cookies-js"
 
 #-------------------------------------------------------------------------------
 exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
     constructor: (@url) ->
+        urlResolved  = URL.resolve window.location.toString(), @url
+        urlParsed    = URL.parse urlResolved
+        @httpOptions = {protocol, hostname, port, pathname} = urlParsed
+        @httpOptions.host = hostname # bug in URL.parse? `host` includes port 
+
+        switch @httpOptions.protocol
+            when "http:"  then @httpMod = http
+            when "https:" then @httpMod = https
+            else 
+                throw new Error "invalid URL: #{@url}"
+
+        @xsrfToken = cookies.get "XSRF-TOKEN"
 
     #---------------------------------------------------------------------------
-    getUser: -> (callback) ->
-        process.nextTick -> 
-            callback() if _.isFunction callback
+    getUser: (callback) ->
+
+        @_xhr "GET", "user", null, (err, response) ->
+            callback err if err?
+
+            try
+                body = JSON.parse(response.body)
+            catch e
+                callback e
+
+            callback null, body.user
+
+        return null
 
     #---------------------------------------------------------------------------
     getStorageNames: (callback) ->
+        @_xhr "GET", "storage", null, (err, response) ->
+            callback err if err?
 
+            try
+                body = JSON.parse(response.body)
+            catch e
+                callback e
+
+            callback null, body.storageNames
+
+        return null
 
     #---------------------------------------------------------------------------
     getStorage: (name) ->
+        return new StorageRemote @, name
 
+    #---------------------------------------------------------------------------
+    _xhr: (method, uri, requestBody, callback) ->
 
+        options = _.clone @httpOptions
+        options.method   = method
+        options.path     = path.join options.path, uri
+        options.headers ?= {}
+        options.headers["X-XSRF-TOKEN"] = @xsrfToken if @xsrfToken?
+        options.headers["Accept"]       = "application/json"
+
+        if requestBody?
+            options.headers["Content-Type"] = "application/json"
+
+        responseBody = ""
+        request = @httpMod.request options, (response) ->
+            response.on "data", (chunk) ->
+                responseBody += "#{chunk}"
+
+            response.on "end", ->
+                response.body = responseBody
+                handleResponse response, callback
+
+        request.on "error", (error) ->
+            callback error
+        
+        request.write requestBody if requestBody?
+        request.end()
+
+#-------------------------------------------------------------------------------
+handleResponse = (response, callback) ->
+    contentType = response.headers["content-type"]
+    if contentType.match /.*json.*/
+        body = response.body || "null"
+
+        try
+            bodyObject = JSON.parse body
+        catch e
+            bodyObject = null
+
+        response.bodyObject = bodyObject
+
+    switch response.statusCode
+        when 200 then # skip
+
+        when 401
+            error = Error "unauthorized"
+            error.name = "unauthorized"
+            callback error
+            return
+
+        else
+            error = Error "invalid return code #{response.statusCode}"
+            error.name = "invalid"
+            callback error
+            return
+
+    callback null, response
 
 #-------------------------------------------------------------------------------
 class StorageRemote
 
     #---------------------------------------------------------------------------
-    constructor: (@manager, @name) ->
+    constructor: (@manager, name) ->
+        @name = encodeURIComponent name
 
     #---------------------------------------------------------------------------
-    keys: (key, callback) ->
+    keys: (callback) ->
+        @manager._xhr "GET", "storage/#{@name}", null, (err, response) ->
+            callback err if err?
+
+            callback null, response.bodyObject?.keys
+
+        return null
 
     #---------------------------------------------------------------------------
     get: (key, callback) ->
+        key = encodeURIComponent key
+        @manager._xhr "GET", "storage/#{@name}/#{key}", null, (err, response) ->
+            callback err if err?
+
+            callback null, response.bodyObject?.value
+
+        return null
 
     #---------------------------------------------------------------------------
     put: (key, value, callback) ->
+        key   = encodeURIComponent key
+        value = JSON.stringify value
+        @manager._xhr "PUT", "storage/#{@name}/#{key}", value, (err, response) ->
+            callback err if err?
+
+            callback()
+
+        return null
 
     #---------------------------------------------------------------------------
     del: (key, callback) ->
+        key = encodeURIComponent key
+
+        @manager._xhr "DELETE", "storage/#{@name}/#{key}", null, (err, response) ->
+            callback err if err?
+
+            callback()
+
+        return null
 
     #---------------------------------------------------------------------------
     clear: (callback) ->
+        @manager._xhr "DELETE", "storage/#{@name}", null, (err, response) ->
+            callback err if err?
 
-    #---------------------------------------------------------------------------
-    destroy: (callback) ->
-        
+            callback()
+
+        return null
+
+#-------------------------------------------------------------------------------
+httpError = (response) ->
+    error = new Error "unexpected http response"
+    error.response = response
+    return error
+
+#-------------------------------------------------------------------------------
+resolveURL = (url) ->
+
+    {protocol, host, pathname} = window.location
+
+    windowURL = "#{protocol}//#{host}#{pathname}"
+
+    return URL.resolve windowURL, url
+
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

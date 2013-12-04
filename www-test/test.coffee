@@ -6,13 +6,13 @@ describe "version", ->
         expect(cloudStorage.version).to.match /^\d+\.\d+\.\d+(.*)$/
 
 #-------------------------------------------------------------------------------
-runTestsDOM = (type) ->
+runTests = (url, expectedUser) ->
 
     storageMgr = null
 
     #----------------------------------
     before (done) ->
-        storageMgr = cloudStorage.getStorageManager type
+        storageMgr = cloudStorage.getStorageManager url
 
         storageMgr.getStorageNames (err, names) ->
             done err if err?
@@ -23,7 +23,7 @@ runTestsDOM = (type) ->
             index = 0
             for name in names
                 storage = storageMgr.getStorage name
-                storage.destroy (err) ->
+                storage.clear (err) ->
                     done err if err?
 
                     index++
@@ -36,12 +36,12 @@ runTestsDOM = (type) ->
         expect(storageMgr).to.be.an "object"
 
     #----------------------------------
-    it "should have a null user", (done) ->
+    it "should have expected user", (done) ->
         storageMgr.getUser (err, user) ->
             done err if err?
 
             try 
-                expect(user?).to.not.be.ok()
+                expect(user).to.eql(expectedUser)
             catch e
                 done e
 
@@ -66,15 +66,7 @@ runTestsDOM = (type) ->
         expect(storage).to.be.an "object"
 
         storageMgr.getStorageNames (err, names) ->
-            done err if err?
-
-            try 
-                expect(names).to.have.length 1
-                expect(names[0]).to.be "test"
-            catch e 
-                done e
-
-            done()
+            done err
 
     #----------------------------------
     it "should return null for keys not present", (done) ->
@@ -180,36 +172,17 @@ runTestsDOM = (type) ->
 
                 done()
 
-    #----------------------------------
-    it "should destroy a storage object", (done) ->
-
-        storage = storageMgr.getStorage "test"
-
-        storage.put "a-key", "a-value", (err) ->
-            done err if err?
-
-            storage.put "b-key", "b-value", (err) ->
-                done err if err?
-
-                storage.destroy (err) ->
-                    done err if err?
-
-                    storage.keys (err, keys) ->
-                        done err if err?
-
-                        try
-                            expect(keys).to.have.length 0
-                        catch e
-                            done e
-
-                        done()
-
 
 #-------------------------------------------------------------------------------
 describe "local", ->
-    runTestsDOM "local"
+    runTests "local"
 
 #-------------------------------------------------------------------------------
 describe "session", ->
-    runTestsDOM "session"
+    runTests "session"
+
+#-------------------------------------------------------------------------------
+describe "remote - global", ->
+    runTests "cloudStorage/global", "global"
+
 

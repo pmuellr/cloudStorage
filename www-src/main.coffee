@@ -28,10 +28,8 @@ cloudStorage.getStorageManager = (url) ->
         storageManager = new domStorage.storageManager window.localStorage
     else if url is "session"
         storageManager = new domStorage.storageManager window.sessionStorage
-    else if url.match /^https?:\/\//
-        storageManager = new remoteStorage.storageManager url
     else
-        throw Error "invalid storage manager url: #{url}"
+        storageManager = new remoteStorage.storageManager url
 
     StorageManagers[url] = storageManager
 

@@ -148,15 +148,6 @@ Remove all the items from the storage object.
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
-`destroy(callback)`
-
-Remove the Store object.
-
-* `callback(err)`
-    * `err` - an Error object when an error occurs, or null if no error occurred
-
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-
 
 
 Errors

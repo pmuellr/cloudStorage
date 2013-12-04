@@ -30,14 +30,19 @@ Config =
             files: __basename
             tasks: "gruntfile-changed"
         source:
-            files: [ "lib-src/**/*", "www-src/**/*", "www-test/*.coffee" ]
+            files: [ 
+                "lib-src/**/*"
+                "lib-test/*.coffee" 
+                "www-src/**/*"
+                "www-test/*.coffee" 
+            ]
             tasks: "build-n-serve"
             options:
                 atBegin:    true
                 interrupt:  true
 
     server:
-        cmd: "server"
+        cmd: "node_modules/.bin/coffee lib-test/server.coffee"
         pidFile: path.join __dirname, "tmp", "server.pid"
 
     clean: [
@@ -120,6 +125,8 @@ build = (task) ->
     #----------------------------------
     log "building test code in www-test"
     coffeec "--output www-test www-test/*.coffee"
+
+    done()
 
     return
 

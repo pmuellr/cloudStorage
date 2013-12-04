@@ -16,12 +16,14 @@
     },
   "devDependencies":
     {
-      "browserify":           "2.35.x",
+      "browserify":           "2.36.x",
       "coffee-script":        "1.6.x",
+      "cookies-js":           "0.3.x",
       "expect.js":            "0.2.x",
       "grunt":                "0.4.x",
       "grunt-contrib-watch":  "0.5.x",
-      "mocha":                "1.14.x",
+      "mocha":                "1.15.x",
+      "ports":                "1.1.x",
       "shelljs":              "0.2.x"
     }
 }

@@ -3,32 +3,25 @@
 _ = require "underscore"
 
 #-------------------------------------------------------------------------------
-exports.storageManager = class StorageManagerDOM 
+exports.storageManager = class StorageManagerGlobal
 
     #---------------------------------------------------------------------------
-    constructor: (@domStorage) ->
+    constructor: ->
+        @_storages = {}
 
     #---------------------------------------------------------------------------
-    getUser: (callback) ->
+    getUser: (request, callback) ->
         process.nextTick -> 
-            callback() if _.isFunction callback
+            callback(null, "global") if callback?
 
         return null
 
     #---------------------------------------------------------------------------
-    getStorageNames: (callback) ->
+    getStorageNames: (request, callback) ->
         names = {}
 
-        pattern = /cloudStorage\.(.*)/
-
-        for i in [0...@domStorage.length]
-            key = @domStorage.key i
-
-            match = key.match pattern
-            continue unless match
-
-            name = ":#{match[1]}"
-            names[name] = true
+        for key, ignored of @_storages
+            names[":#{key}"] = true
 
         result = []
         for own name, ignored of names
@@ -40,44 +33,11 @@ exports.storageManager = class StorageManagerDOM
         return null
 
     #---------------------------------------------------------------------------
-    getStorage: (name) ->
-
-        storage = @domStorage.getItem "cloudStorage.#{name}"
-        unless storage?
-            storage = "{}"
-
-        try
-            storage = JSON.parse storage
-        catch e
-            storage = {}
-        
-        return new StorageDOM @, name, storage
-
-    #---------------------------------------------------------------------------
-    _store: (name, storage) ->
-        try 
-            storage = JSON.stringify storage
-        catch e
-            return
-
-        @domStorage.setItem "cloudStorage.#{name}", storage
-
-    #---------------------------------------------------------------------------
-    _delete: (name) ->
-
-        @domStorage.removeItem "cloudStorage.#{name}"
-
-#-------------------------------------------------------------------------------
-class StorageDOM
-
-    #---------------------------------------------------------------------------
-    constructor: (@manager, @name, @storage) ->
-
-    #---------------------------------------------------------------------------
-    keys: (callback) ->
+    keys: (request, name, callback) ->
         result = []
+        storage = @_storages[":#{name}"] || {}
 
-        for key, val of @storage
+        for key, val of storage
             result.push key.substr 1
 
         process.nextTick ->
@@ -86,8 +46,9 @@ class StorageDOM
         return null
 
     #---------------------------------------------------------------------------
-    get: (key, callback) ->
-        result = @storage[":#{key}"]
+    get: (request, name, key, callback) ->
+        storage = @_storages[":#{name}"] || {}
+        result  = storage[":#{key}"]
 
         process.nextTick ->
             callback null, result if callback?
@@ -95,9 +56,12 @@ class StorageDOM
         return null
 
     #---------------------------------------------------------------------------
-    put: (key, value, callback) ->
-        @storage[":#{key}"] = value
-        @manager._store @name, @storage
+    put: (request, name, key, value, callback) ->
+        console.log "StorageManagerGlobal::put(#{name},#{key}, #{JSON.stringify value})"
+        storage = @_storages[":#{name}"] || {}
+
+        storage[":#{key}"] = value
+        @_store name, storage
 
         process.nextTick ->
             callback null if callback?
@@ -105,9 +69,11 @@ class StorageDOM
         return null
 
     #---------------------------------------------------------------------------
-    del: (key, callback) ->
-        delete @storage[":#{key}"]
-        @manager._store @name, @storage
+    del: (request, name, key, callback) ->
+        storage = @_storages[":#{name}"] || {}
+
+        delete storage[":#{key}"]
+        @_store name, storage
 
         process.nextTick ->
             callback null if callback?
@@ -115,14 +81,28 @@ class StorageDOM
         return null
 
     #---------------------------------------------------------------------------
-    clear: (callback) ->
-        @storage = {}
-        @manager._delete @name
+    clear: (request, name, callback) ->
+        @_delete name
 
         process.nextTick ->
             callback null if callback?
 
         return null
+
+    #---------------------------------------------------------------------------
+    _delete: (name) ->
+        delete @_storages[":#{name}"]
+
+    #---------------------------------------------------------------------------
+    _store: (name, storage) ->
+        @_dumpStorages "StorageManagerGlobal::_store() ->"
+        @_storages[":#{name}"] = storage
+        @_dumpStorages "_store() <-"
+
+    #---------------------------------------------------------------------------
+    _dumpStorages: (title) ->
+        console.log "dumpStorages: #{title}"
+        console.log @_storages
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller
