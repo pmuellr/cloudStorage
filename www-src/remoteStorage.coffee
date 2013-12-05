@@ -1,9 +1,7 @@
 # Licensed under the Apache License. See footer for details.
 
-URL   = require "url"
+#URL   = require "url"
 path  = require "path"
-http  = require "http"
-https = require "https"
 
 _       = require "underscore"
 cookies = require "cookies-js"
@@ -13,45 +11,24 @@ exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
     constructor: (@url) ->
-        urlResolved  = URL.resolve window.location.toString(), @url
-        urlParsed    = URL.parse urlResolved
-        @httpOptions = {protocol, hostname, port, pathname} = urlParsed
-        @httpOptions.host = hostname # bug in URL.parse? `host` includes port 
-
-        switch @httpOptions.protocol
-            when "http:"  then @httpMod = http
-            when "https:" then @httpMod = https
-            else 
-                throw new Error "invalid URL: #{@url}"
-
         @xsrfToken = cookies.get "XSRF-TOKEN"
 
     #---------------------------------------------------------------------------
     getUser: (callback) ->
 
         @_xhr "GET", "user", null, (err, response) ->
-            callback err if err?
+            return callback err if err?
 
-            try
-                body = JSON.parse(response.body)
-            catch e
-                callback e
-
-            callback null, body.user
+            callback null, response.bodyObject?.user
 
         return null
 
     #---------------------------------------------------------------------------
     getStorageNames: (callback) ->
         @_xhr "GET", "storage", null, (err, response) ->
-            callback err if err?
+            return callback err if err?
 
-            try
-                body = JSON.parse(response.body)
-            catch e
-                callback e
-
-            callback null, body.storageNames
+            callback null, response.bodyObject?.storageNames
 
         return null
 
@@ -60,62 +37,48 @@ exports.storageManager = class StorageManagerRemote
         return new StorageRemote @, name
 
     #---------------------------------------------------------------------------
+    _xhrOnRSC: (e, callback) ->
+        xhr = e.target
+
+        return unless xhr.readyState is 4
+
+        unless xhr.status is 200
+            message = "invalid HTTP status #{xhr.status}: #{xhr.statusText}"
+            return callback errorResult "ServerError", message
+
+        contentType = xhr.getResponseHeader "Content-Type"
+
+        response = 
+            body: xhr.response
+
+        if contentType.match /json/
+            try
+                response.bodyObject = JSON.parse response.body
+            catch e
+                message = "invalid JSON sent from server"
+                return callback errorResult "ServerError", message
+
+        callback null, response
+
+    #---------------------------------------------------------------------------
     _xhr: (method, uri, requestBody, callback) ->
+        url = path.join @url, uri
 
-        options = _.clone @httpOptions
-        options.method   = method
-        options.path     = path.join options.path, uri
-        options.headers ?= {}
-        options.headers["X-XSRF-TOKEN"] = @xsrfToken if @xsrfToken?
-        options.headers["Accept"]       = "application/json"
+        xhr = new XMLHttpRequest
 
-        if requestBody?
-            options.headers["Content-Type"] = "application/json"
+        xhr.onreadystatechange = (e) => @_xhrOnRSC(e, callback)
 
-        responseBody = ""
-        request = @httpMod.request options, (response) ->
-            response.on "data", (chunk) ->
-                responseBody += "#{chunk}"
+        xhr.open method, url, true
+        xhr.setRequestHeader "Accept",       "application/json"
+        xhr.setRequestHeader "Content-Type", "application/json" if requestBody?
+        xhr.setRequestHeader "X-XSRF-TOKEN", @xsrfToken         if @xsrfToken?
 
-            response.on "end", ->
-                response.body = responseBody
-                handleResponse response, callback
-
-        request.on "error", (error) ->
-            callback error
-        
-        request.write requestBody if requestBody?
-        request.end()
-
-#-------------------------------------------------------------------------------
-handleResponse = (response, callback) ->
-    contentType = response.headers["content-type"]
-    if contentType.match /.*json.*/
-        body = response.body || "null"
-
-        try
-            bodyObject = JSON.parse body
-        catch e
-            bodyObject = null
-
-        response.bodyObject = bodyObject
-
-    switch response.statusCode
-        when 200 then # skip
-
-        when 401
-            error = Error "unauthorized"
-            error.name = "unauthorized"
-            callback error
-            return
-
+        if requestBody
+            xhr.send requestBody
         else
-            error = Error "invalid return code #{response.statusCode}"
-            error.name = "invalid"
-            callback error
-            return
+            xhr.send()
 
-    callback null, response
+        return
 
 #-------------------------------------------------------------------------------
 class StorageRemote
@@ -127,7 +90,7 @@ class StorageRemote
     #---------------------------------------------------------------------------
     keys: (callback) ->
         @manager._xhr "GET", "storage/#{@name}", null, (err, response) ->
-            callback err if err?
+            return callback err if err?
 
             callback null, response.bodyObject?.keys
 
@@ -137,7 +100,7 @@ class StorageRemote
     get: (key, callback) ->
         key = encodeURIComponent key
         @manager._xhr "GET", "storage/#{@name}/#{key}", null, (err, response) ->
-            callback err if err?
+            return callback err if err?
 
             callback null, response.bodyObject?.value
 
@@ -146,9 +109,9 @@ class StorageRemote
     #---------------------------------------------------------------------------
     put: (key, value, callback) ->
         key   = encodeURIComponent key
-        value = JSON.stringify value
+        value = JSON.stringify {value}
         @manager._xhr "PUT", "storage/#{@name}/#{key}", value, (err, response) ->
-            callback err if err?
+            return callback err if err?
 
             callback()
 
@@ -159,7 +122,7 @@ class StorageRemote
         key = encodeURIComponent key
 
         @manager._xhr "DELETE", "storage/#{@name}/#{key}", null, (err, response) ->
-            callback err if err?
+            return callback err if err?
 
             callback()
 
@@ -168,7 +131,7 @@ class StorageRemote
     #---------------------------------------------------------------------------
     clear: (callback) ->
         @manager._xhr "DELETE", "storage/#{@name}", null, (err, response) ->
-            callback err if err?
+            return callback err if err?
 
             callback()
 
@@ -188,6 +151,13 @@ resolveURL = (url) ->
     windowURL = "#{protocol}//#{host}#{pathname}"
 
     return URL.resolve windowURL, url
+
+#-------------------------------------------------------------------------------
+errorResult = (name, message) ->
+    err = new Error message
+    err.name = name
+
+    err
 
 
 #-------------------------------------------------------------------------------

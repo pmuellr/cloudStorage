@@ -27,20 +27,22 @@ class Handler
     #---------------------------------------------------------------------------
     getUser: (request, response) ->
         @storageManager.getUser request, (err, user) ->
-            if err?
-                return response.send 500, "#{err}"
+            return response.send errorResult err if err?
 
-            response.send {user}
+            response.send
+                status: "ok"
+                user:   "#{user}"
 
         return
 
     #---------------------------------------------------------------------------
     getStorageNames: (request, response) ->
         @storageManager.getStorageNames request, (err, storageNames) ->
-            if err?
-                return response.send 500, "#{err}"
-
-            response.send {storageNames}
+            return response.send errorResult err if err?
+            
+            response.send
+                status:       "ok"
+                storageNames: storageNames
 
         return
 
@@ -49,10 +51,11 @@ class Handler
         name = request.params.name
 
         @storageManager.keys request, name, (err, keys) ->
-            if err?
-                return response.send 500, "#{err}"
-
-            response.send {keys}
+            return response.send errorResult err if err?
+            
+            response.send
+                status: "ok"
+                keys:   keys
 
         return
 
@@ -61,10 +64,10 @@ class Handler
         name = request.params.name
 
         @storageManager.clear request, name, (err) ->
-            if err?
-                return response.send 500, "#{err}"
-
-            response.send 200
+            return response.send errorResult err if err?
+            
+            response.send
+                status: "ok"
 
         return
 
@@ -74,10 +77,12 @@ class Handler
         key  = request.params.key
 
         @storageManager.get request, name, key, (err, value) ->
-            if err?
-                return response.send 500, "#{err}"
-
-            response.send {value}
+            return response.send errorResult err if err?
+            
+            response.send
+                status: "ok"
+                key:    key
+                value:  value
 
         return
 
@@ -86,14 +91,13 @@ class Handler
     put: (request, response) ->
         name  = request.params.name
         key   = request.params.key
-        value = request.body
-        console.log "cloudStorage::put(#{name}, #{key}, #{JSON.stringify value})"
+        value = request?.body?.value
 
         @storageManager.put request, name, key, value, (err) ->
-            if err?
-                return response.send 500, "#{err}"
-
-            response.send 200
+            return response.send errorResult err if err?
+            
+            response.send
+                status: "ok"
 
         return
 
@@ -103,12 +107,18 @@ class Handler
         key  = request.params.key
 
         @storageManager.del request, name, key, (err, value) ->
-            if err?
-                return response.send 500, "#{err}"
-
-            response.send 200
+            return response.send errorResult err if err?
+            
+            response.send
+                status: "ok"
 
         return
+
+#-------------------------------------------------------------------------------
+errorResult = (err) ->
+    status:  "StorageError"    
+    name:    "#{err.name}"
+    message: "#{err.message}"
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

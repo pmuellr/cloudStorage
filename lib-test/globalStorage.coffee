@@ -57,7 +57,6 @@ exports.storageManager = class StorageManagerGlobal
 
     #---------------------------------------------------------------------------
     put: (request, name, key, value, callback) ->
-        console.log "StorageManagerGlobal::put(#{name},#{key}, #{JSON.stringify value})"
         storage = @_storages[":#{name}"] || {}
 
         storage[":#{key}"] = value
@@ -95,9 +94,7 @@ exports.storageManager = class StorageManagerGlobal
 
     #---------------------------------------------------------------------------
     _store: (name, storage) ->
-        @_dumpStorages "StorageManagerGlobal::_store() ->"
         @_storages[":#{name}"] = storage
-        @_dumpStorages "_store() <-"
 
     #---------------------------------------------------------------------------
     _dumpStorages: (title) ->
