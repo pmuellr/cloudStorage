@@ -16,7 +16,7 @@ exports.storageManager = class StorageManagerDOM
         return null
 
     #---------------------------------------------------------------------------
-    getStorageNames: (callback) ->
+    getStorageNames: (userid, callback) ->
         names = {}
 
         pattern = /cloudStorage\.(.*)/
@@ -40,7 +40,7 @@ exports.storageManager = class StorageManagerDOM
         return null
 
     #---------------------------------------------------------------------------
-    getStorage: (name) ->
+    getStorage: (userid, name) ->
 
         storage = @domStorage.getItem "cloudStorage.#{name}"
         unless storage?

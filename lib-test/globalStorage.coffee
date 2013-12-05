@@ -2,6 +2,14 @@
 
 _ = require "underscore"
 
+User = 
+    provider:    "globalStorage"
+    id:          "anonymous"
+    displayName: "<anonymous>"
+    photos: [
+        value:   "http://commons.wikimedia.org/wiki/File%3AGuy_Fawkes_Mask_Image.jpg"
+    ]
+
 #-------------------------------------------------------------------------------
 exports.storageManager = class StorageManagerGlobal
 
@@ -10,14 +18,21 @@ exports.storageManager = class StorageManagerGlobal
         @_storages = {}
 
     #---------------------------------------------------------------------------
-    getUser: (request, callback) ->
+    getUserID: (request, callback) ->
         process.nextTick -> 
-            callback(null, "global") if callback?
+            callback null, User.id
 
-        return null
+        return
 
     #---------------------------------------------------------------------------
-    getStorageNames: (request, callback) ->
+    getUser: (request, callback) ->
+        process.nextTick -> 
+            callback null, User
+
+        return
+
+    #---------------------------------------------------------------------------
+    getStorageNames: (request, user, callback) ->
         names = {}
 
         for key, ignored of @_storages
@@ -33,7 +48,7 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    keys: (request, name, callback) ->
+    keys: (request, user, name, callback) ->
         result = []
         storage = @_storages[":#{name}"] || {}
 
@@ -46,7 +61,7 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    get: (request, name, key, callback) ->
+    get: (request, user, name, key, callback) ->
         storage = @_storages[":#{name}"] || {}
         result  = storage[":#{key}"]
 
@@ -56,7 +71,7 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    put: (request, name, key, value, callback) ->
+    put: (request, user, name, key, value, callback) ->
         storage = @_storages[":#{name}"] || {}
 
         storage[":#{key}"] = value
@@ -68,7 +83,7 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    del: (request, name, key, callback) ->
+    del: (request, user, name, key, callback) ->
         storage = @_storages[":#{name}"] || {}
 
         delete storage[":#{key}"]
@@ -80,7 +95,7 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    clear: (request, name, callback) ->
+    clear: (request, user, name, callback) ->
         @_delete name
 
         process.nextTick ->

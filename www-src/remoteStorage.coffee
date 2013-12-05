@@ -15,7 +15,6 @@ exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
     getUser: (callback) ->
-
         @_xhr "GET", "user", null, (err, response) ->
             return callback err if err?
 
@@ -24,8 +23,10 @@ exports.storageManager = class StorageManagerRemote
         return null
 
     #---------------------------------------------------------------------------
-    getStorageNames: (callback) ->
-        @_xhr "GET", "storage", null, (err, response) ->
+    getStorageNames: (userid, callback) ->
+        userid = encodeURIComponent userid
+
+        @_xhr "GET", "/u/#{userid}/s", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.storageNames
@@ -33,8 +34,8 @@ exports.storageManager = class StorageManagerRemote
         return null
 
     #---------------------------------------------------------------------------
-    getStorage: (name) ->
-        return new StorageRemote @, name
+    getStorage: (userid, name) ->
+        return new StorageRemote @, userid, name
 
     #---------------------------------------------------------------------------
     _xhrOnRSC: (e, callback) ->
@@ -84,12 +85,13 @@ exports.storageManager = class StorageManagerRemote
 class StorageRemote
 
     #---------------------------------------------------------------------------
-    constructor: (@manager, name) ->
-        @name = encodeURIComponent name
+    constructor: (@manager, userid, name) ->
+        @userid = encodeURIComponent userid
+        @name   = encodeURIComponent name
 
     #---------------------------------------------------------------------------
     keys: (callback) ->
-        @manager._xhr "GET", "storage/#{@name}", null, (err, response) ->
+        @manager._xhr "GET", "/u/#{@userid}/s/#{@name}", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.keys
@@ -99,7 +101,7 @@ class StorageRemote
     #---------------------------------------------------------------------------
     get: (key, callback) ->
         key = encodeURIComponent key
-        @manager._xhr "GET", "storage/#{@name}/#{key}", null, (err, response) ->
+        @manager._xhr "GET", "/u/#{@userid}/s/#{@name}/#{key}", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.value
@@ -110,7 +112,7 @@ class StorageRemote
     put: (key, value, callback) ->
         key   = encodeURIComponent key
         value = JSON.stringify {value}
-        @manager._xhr "PUT", "storage/#{@name}/#{key}", value, (err, response) ->
+        @manager._xhr "PUT", "/u/#{@userid}/s/#{@name}/#{key}", value, (err, response) ->
             return callback err if err?
 
             callback()
@@ -121,7 +123,7 @@ class StorageRemote
     del: (key, callback) ->
         key = encodeURIComponent key
 
-        @manager._xhr "DELETE", "storage/#{@name}/#{key}", null, (err, response) ->
+        @manager._xhr "DELETE", "/u/#{@userid}/s/#{@name}/#{key}", null, (err, response) ->
             return callback err if err?
 
             callback()
@@ -130,7 +132,7 @@ class StorageRemote
 
     #---------------------------------------------------------------------------
     clear: (callback) ->
-        @manager._xhr "DELETE", "storage/#{@name}", null, (err, response) ->
+        @manager._xhr "DELETE", "/u/#{@userid}/s/#{@name}", null, (err, response) ->
             return callback err if err?
 
             callback()
@@ -158,7 +160,6 @@ errorResult = (name, message) ->
     err.name = name
 
     err
-
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

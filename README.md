@@ -8,10 +8,34 @@ but stores it's items in the cloud.  Wrappers for localStorage and sessionStorag
 objects are also provided.
 
 cloudStorage requires authentication, but doesn't provide APIs for authentication;
-bring your own.  Requirements on the server are that the request object should
-contain a session (in `req.session`) and that the session object should contain
-a property `userid`, which is the currently logged in user.
+bring your own.
 
+
+
+general structure
+================================================================================
+
+cloudStorage manages storage objects.  A storage object is basically a Map or
+Dictionary.  It contains a number of key/value pairs, where the keys are 
+strings and the values are JSON-able objects.  You can get/set/delete 
+key value pairs in the usual way, and you can obtain an array of all 
+the keys.  You can also remove all the keys/value pairs with the `clear()`
+method.
+
+There are three flavors of storage objects: "local", "session", and "remote".
+
+"local" and "session" map storage objects to a key/valure pair in 
+`window.localStorage` and `window.sessionStorage`.
+
+"remote" storage objects are stored on a server.  To use a remote storage
+object, you will likely have to be "logged in" to the server.  You can
+obtain the currently logged in user with the `getUser()` method of the
+storage manager.  The user object returned by that call has an `id` field
+which is the value that should be used as `userid` in subsequent 
+cloudStorage method invocations.  Note that they don't **HAVE** to be the 
+same.  If they're different, then you are attempting to access
+someone else's storage objects.  Which may be fine, or may not be fine,
+depending on the storage manager.
 
 
 browser api
@@ -64,12 +88,16 @@ Return the currently signed in user.
     * `user` - the currently logged in user, spec'ed in
       [Passport's User Profile](http://passportjs.org/guide/profile/).
 
+The user object will be null if the user is not logged in, or for storage
+managers which don't support users.
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
-`getStorageNames(callback)` 
+`getStorageNames(userid, callback)` 
 
 Return the names of the available storage objects.
+
+* `userid` - the userid of the storage objects to be processed
 
 * `callback(err, names)`
     * `err` - an Error object when an error occurs, or null if no error occurred
@@ -78,9 +106,13 @@ Return the names of the available storage objects.
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
-`getStorage(name)` 
+`getStorage(userid, name)` 
 
 Return a storage object with the specified name.
+
+* `userid` - the userid of the storage objects to be processed
+
+* `name` - the name of the storage object to access
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
@@ -154,12 +186,7 @@ Errors
 --------------------------------------------------------------------------------
 
 Errors returned in callback will be null when no error occurred, otherwise
-they are an instance of Error objects.  The following values will be 
-available in the `name` property.
-
-`notAuthenticated`
-`notAuthorized`
-`notConnected`
+they are an instance of Error objects. 
 
 
 
@@ -168,7 +195,10 @@ hacking
 
 Run `grunt watch` to run the build workflow such that when a source file
 changes, the server will be rebuilt and relaunched.  Run `grunt` with no 
-arguments to see the list of tasks available.
+arguments to see the list of tasks available.  You may need to run a `bower`,
+`vendor`, etc grunt task before the `watch` task will work.  And obviously
+you will need to run `npm install` on a freshly cloned repo to get all
+the node dependencies installed.
 
 
 

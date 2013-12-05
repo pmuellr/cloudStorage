@@ -8,15 +8,28 @@ cloudStorage = exports
 cloudStorage.configure = (app, storageManager) ->
     handler = new Handler storageManager
 
-    app.get    "/user",                  (req, res) -> handler.getUser         req, res
-    app.get    "/storage",               (req, res) -> handler.getStorageNames req, res
-    app.get    "/storage/:name",         (req, res) -> handler.keys            req, res
-    app.delete "/storage/:name",         (req, res) -> handler.clear           req, res
-    app.get    "/storage/:name/:key",    (req, res) -> handler.get             req, res
-    app.put    "/storage/:name/:key",    (req, res) -> handler.put             req, res
-    app.delete "/storage/:name/:key",    (req, res) -> handler.del             req, res
+    app.all    "*", setCloudStorage(handler)
+
+    app.get    "/user",                  (req,res)->  handler.getUser         req, res
+    app.get    "/u/:user/s",             (req,res)->  handler.getStorageNames req, res
+    app.get    "/u/:user/s/:name",       (req,res)->  handler.keys            req, res
+    app.delete "/u/:user/s/:name",       (req,res)->  handler.clear           req, res
+    app.get    "/u/:user/s/:name/:key",  (req,res)->  handler.get             req, res
+    app.put    "/u/:user/s/:name/:key",  (req,res)->  handler.put             req, res
+    app.delete "/u/:user/s/:name/:key",  (req,res)->  handler.del             req, res
 
     return app
+
+#-------------------------------------------------------------------------------
+setCloudStorage = (handler) ->
+    (request, response, next) ->
+        handler.getUserID request, (err, userid) ->
+            return response.send errorResult err if err?
+
+            request.cloudStorage =
+                userid: userid
+
+            next()
 
 #-------------------------------------------------------------------------------
 class Handler 
@@ -25,19 +38,26 @@ class Handler
     constructor: (@storageManager) ->
 
     #---------------------------------------------------------------------------
+    getUserID: (request, callback) ->
+        @storageManager.getUserID request, callback
+
+    #---------------------------------------------------------------------------
     getUser: (request, response) ->
         @storageManager.getUser request, (err, user) ->
             return response.send errorResult err if err?
 
+            response.set "Cache-Control", "no-cache"
             response.send
                 status: "ok"
-                user:   "#{user}"
+                user:   user
 
         return
 
     #---------------------------------------------------------------------------
     getStorageNames: (request, response) ->
-        @storageManager.getStorageNames request, (err, storageNames) ->
+        user = request.params.user
+
+        @storageManager.getStorageNames request, user, (err, storageNames) ->
             return response.send errorResult err if err?
             
             response.send
@@ -48,9 +68,10 @@ class Handler
 
     #---------------------------------------------------------------------------
     keys: (request, response) ->
+        user = request.params.user
         name = request.params.name
 
-        @storageManager.keys request, name, (err, keys) ->
+        @storageManager.keys request, user, name, (err, keys) ->
             return response.send errorResult err if err?
             
             response.send
@@ -61,9 +82,10 @@ class Handler
 
     #---------------------------------------------------------------------------
     clear: (request, response) ->
+        user = request.params.user
         name = request.params.name
 
-        @storageManager.clear request, name, (err) ->
+        @storageManager.clear request, user, name, (err) ->
             return response.send errorResult err if err?
             
             response.send
@@ -73,10 +95,11 @@ class Handler
 
     #---------------------------------------------------------------------------
     get: (request, response) ->
+        user = request.params.user
         name = request.params.name
         key  = request.params.key
 
-        @storageManager.get request, name, key, (err, value) ->
+        @storageManager.get request, user, name, key, (err, value) ->
             return response.send errorResult err if err?
             
             response.send
@@ -89,11 +112,12 @@ class Handler
 
     #---------------------------------------------------------------------------
     put: (request, response) ->
+        user  = request.params.user
         name  = request.params.name
         key   = request.params.key
         value = request?.body?.value
 
-        @storageManager.put request, name, key, value, (err) ->
+        @storageManager.put request, user, name, key, value, (err) ->
             return response.send errorResult err if err?
             
             response.send
@@ -103,10 +127,11 @@ class Handler
 
     #---------------------------------------------------------------------------
     del: (request, response) ->
+        user = request.params.user
         name = request.params.name
         key  = request.params.key
 
-        @storageManager.del request, name, key, (err, value) ->
+        @storageManager.del request, user, name, key, (err, value) ->
             return response.send errorResult err if err?
             
             response.send
