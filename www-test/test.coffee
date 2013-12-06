@@ -111,7 +111,6 @@ runTests = (storageMgr, userid) ->
             for name in names
                 return done() if name is "/"
 
-
             trycatch done, -> expect().fail()
 
             done()
@@ -126,6 +125,48 @@ runTests = (storageMgr, userid) ->
 
             for key in keys
                 return done() if key is "::/::"
+
+            trycatch done, -> expect().fail()
+
+            done()
+
+    #----------------------------------
+    it "should create dotted users, storage names and keys", (done) ->
+
+        storage = storageMgr.getStorage ".a", ".b"
+
+        storage.put ".c", "dotc", (err) ->
+            return done err if err?
+
+            storage.get ".c", (err, value) ->
+
+                trycatch done, -> expect(value).to.be "dotc"
+
+                done()
+
+    #----------------------------------
+    it "should read dotted storage names", (done) ->
+
+        storageMgr.getStorageNames ".a", (err, names) ->
+            return done err if err?
+
+            for name in names
+                return done() if name is ".b"
+
+            trycatch done, -> expect().fail()
+
+            done()
+
+    #----------------------------------
+    it "should read dotted keys", (done) ->
+
+        storage = storageMgr.getStorage ".a", ".b"
+
+        storage.keys (err, keys) ->
+            return done err if err?
+
+            for key in keys
+                return done() if key is ".c"
 
             trycatch done, -> expect().fail()
 

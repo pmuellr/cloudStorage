@@ -27,6 +27,8 @@ exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
     getStorageNames: (userid, callback) ->
+        throw Error "invalid userid" if userid.match /^\.+$/
+
         {callback, result} = getCallbackAndResult callback
 
         userid = encodeURIComponent userid
@@ -40,6 +42,9 @@ exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
     getStorage: (userid, name) ->
+        throw Error "invalid userid" if userid.match /^\.+$/
+        throw Error "invalid name"   if name.match   /^\.+$/
+
         return new StorageRemote @, userid, name
 
     #---------------------------------------------------------------------------
@@ -108,6 +113,8 @@ class StorageRemote
 
     #---------------------------------------------------------------------------
     get: (key, callback) ->
+        throw Error "invalid key" if key.match /^\.+$/
+
         {callback, result} = getCallbackAndResult callback
 
         key = encodeURIComponent key
@@ -120,6 +127,8 @@ class StorageRemote
 
     #---------------------------------------------------------------------------
     put: (key, value, callback) ->
+        throw Error "invalid key" if key.match /^\.+$/
+        
         {callback, result} = getCallbackAndResult callback
 
         key   = encodeURIComponent key
@@ -134,6 +143,8 @@ class StorageRemote
 
     #---------------------------------------------------------------------------
     del: (key, callback) ->
+        throw Error "invalid key" if key.match /^\.+$/
+        
         {callback, result} = getCallbackAndResult callback
 
         key = encodeURIComponent key

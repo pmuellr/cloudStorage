@@ -23,16 +23,12 @@ exports.storageManager = class StorageManagerDOM
 
         names = {}
 
-        pattern = /cloudStorage\.(.*?)\.(.*)/
-
         for i in [0...@_domStorage.length]
-            key = @_domStorage.key i
+            {name, key} = storageKeyParse @_domStorage.key i
 
-            match = key.match pattern
-            continue unless match
+            continue unless name? and key?
 
-            name = ":#{match[1]}"
-            names[name] = true
+            names[":#{name}"] = true
 
         returnedNames = []
         for own name, ignored of names
@@ -44,6 +40,8 @@ exports.storageManager = class StorageManagerDOM
 
     #---------------------------------------------------------------------------
     getStorage: (userid, name) ->
+        throw Error "invalid name" if name.match /^\.+$/
+
         return new StorageDOM @, name, @_domStorage
 
 #-------------------------------------------------------------------------------
@@ -56,17 +54,13 @@ class StorageDOM
     keys: (callback) ->
         {callback, result} = getCallbackAndResult callback
 
-        pattern = /cloudStorage\.(.*?)\.(.*)/
-
         keys = {}
         for i in [0...@_domStorage.length]
-            key = @_domStorage.key i
+            {name, key} = storageKeyParse @_domStorage.key i
 
-            match = key.match pattern
-            continue unless match
-            continue unless match[1] is @_name
+            continue unless (name is @_name) and key?
 
-            keys[":#{match[2]}"] = true
+            keys[":#{key}"] = true
 
         returnedKeys = []
         for key, ignored of keys
@@ -78,9 +72,11 @@ class StorageDOM
 
     #---------------------------------------------------------------------------
     get: (key, callback) ->
+        throw Error "invalid key" if key.match /^\.+$/
+
         {callback, result} = getCallbackAndResult callback
 
-        skey  = "cloudStorage.#{@_name}.#{key}"
+        skey  = storageKeyGenerate @_name, key
         value = @_domStorage.getItem skey
 
         try
@@ -95,9 +91,11 @@ class StorageDOM
 
     #---------------------------------------------------------------------------
     put: (key, value, callback) ->
+        throw Error "invalid key" if key.match /^\.+$/
+
         {callback, result} = getCallbackAndResult callback
 
-        skey = "cloudStorage.#{@_name}.#{key}"
+        skey  = storageKeyGenerate @_name, key
 
         try
             value = JSON.stringify value
@@ -113,9 +111,11 @@ class StorageDOM
 
     #---------------------------------------------------------------------------
     del: (key, callback) ->
+        throw Error "invalid key" if key.match /^\.+$/
+
         {callback, result} = getCallbackAndResult callback
 
-        skey = "cloudStorage.#{@_name}.#{key}"
+        skey  = storageKeyGenerate @_name, key
         @_domStorage.removeItem skey
 
         process.nextTick -> callback()
@@ -128,12 +128,29 @@ class StorageDOM
 
         @keys (err, keys) =>
             for key in keys
-                skey = "cloudStorage.#{@_name}.#{key}"
+                skey  = storageKeyGenerate @_name, key
                 @_domStorage.removeItem skey
 
             callback()
 
         return result
+
+#-------------------------------------------------------------------------------
+storageKeyGenerate = (name, key) ->
+    "cloudStorage/#{encodeURIComponent name}/#{encodeURIComponent key}"
+
+#-------------------------------------------------------------------------------
+storageKeyParse = (skey) ->
+    name = null
+    key  = null
+
+    match = skey.match /cloudStorage\/(.*?)\/(.*)/
+    return {name, key} unless match?
+
+    name  = decodeURIComponent match[1]
+    key   = decodeURIComponent match[2]
+
+    {name, key}
 
 #-------------------------------------------------------------------------------
 getCallbackAndResult = (callback) ->

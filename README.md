@@ -34,6 +34,10 @@ storage manager.
 
 Storage objects can be obtained from a storage manager.
 
+Because of the URL encoding of the resources involved, userids, storage
+names, and keys must not be a string of "." characters; eg "." and ".."
+are invalid values.
+
 
 
 browser api

@@ -1,9 +1,5 @@
 # Licensed under the Apache License. See footer for details.
 
-url   = require "url"
-http  = require "http"
-https = require "https"
-
 _ = require "underscore"
 
 pkg     = require "./package.json"
