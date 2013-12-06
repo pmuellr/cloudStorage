@@ -202,8 +202,8 @@ runTests = (storageMgr, userid) ->
                     expect(user.id).to.eql userid
                 else
                     expect(user).to.eql userid
-        p.then done()
-        p.fail (err) -> done(err)
+        p.then -> done()
+        p.fail done
         return
 
     #----------------------------------
@@ -211,8 +211,8 @@ runTests = (storageMgr, userid) ->
         p = storageMgr.getStorageNames userid
 
         p.then (names) -> trycatch(done, -> expect(names).to.be.an Array)
-        p.then done()
-        p.fail (err) -> done(err)
+        p.then -> done()
+        p.fail done
         return
 
     #----------------------------------
@@ -222,8 +222,8 @@ runTests = (storageMgr, userid) ->
         p0 = storage.put "p", "q"
         p1 = p0.then -> storage.get "p"
         p1.then (value) -> trycatch(done, -> expect(value).to.be "q")
-        p1.then done()
-        p1.fail (err) -> done(err) 
+        p1.then -> done()
+        p1.fail done
         return
 
     #----------------------------------
@@ -232,9 +232,9 @@ runTests = (storageMgr, userid) ->
 
         p0 = storage.del "p"
         p1 = p0.then -> storage.get "p"
-        p1.then (value) -> trycatch(done, -> expect(value).to.eql null)
-        p1.then done()
-        p1.fail (err) -> done(err) 
+        p1.then (value) -> trycatch(done, -> expect(value).to.not.be.ok())
+        p1.then -> done()
+        p1.fail done
         return
 
     #----------------------------------
@@ -243,9 +243,9 @@ runTests = (storageMgr, userid) ->
 
         p0 = storage.put "p", "q"
         p1 = p0.then -> storage.keys()
-        p1.then (keys) -> trycatch(done, -> expect(value).to.eql ["p"])
-        p1.then done()
-        p1.fail (err) -> done(err) 
+        p1.then (keys) -> trycatch(done, -> expect(keys).to.eql ["p"])
+        p1.then -> done()
+        p1.fail done
         return
 
     #----------------------------------
@@ -254,10 +254,19 @@ runTests = (storageMgr, userid) ->
 
         p0 = storage.clear()
         p1 = p0.then -> storage.keys()
-        p1.then (keys) -> trycatch(done, -> expect(value).to.eql [])
-        p1.then done()
-        p1.fail (err) -> done(err) 
+        p1.then (keys) -> trycatch(done, -> expect(keys).to.eql [])
+        p1.then -> done()
+        p1.fail done
         return
+
+    #----------------------------------
+    it "should leave some droppings", (done) ->
+        storage = storageMgr.getStorage userid, "test-droppings"
+        p0 =            storage.put "a", "1"
+        p1 = p0.then -> storage.put "b", "2"
+        p2 = p1.then -> storage.put "c", "3"
+        p2.then -> done()
+        p2.fail done
 
 
 #-------------------------------------------------------------------------------
@@ -266,7 +275,6 @@ trycatch = (done, fn) ->
         fn()
     catch e
         done(e)
-    
 
 #-------------------------------------------------------------------------------
 describe "local", ->

@@ -7,7 +7,7 @@ Q = require "q"
 exports.storageManager = class StorageManagerDOM 
 
     #---------------------------------------------------------------------------
-    constructor: (@domStorage) ->
+    constructor: (@_domStorage) ->
 
     #---------------------------------------------------------------------------
     getUser: (callback) ->
@@ -23,10 +23,10 @@ exports.storageManager = class StorageManagerDOM
 
         names = {}
 
-        pattern = /cloudStorage\.(.*)/
+        pattern = /cloudStorage\.(.*?)\.(.*)/
 
-        for i in [0...@domStorage.length]
-            key = @domStorage.key i
+        for i in [0...@_domStorage.length]
+            key = @_domStorage.key i
 
             match = key.match pattern
             continue unless match
@@ -44,45 +44,32 @@ exports.storageManager = class StorageManagerDOM
 
     #---------------------------------------------------------------------------
     getStorage: (userid, name) ->
-
-        storage = @domStorage.getItem "cloudStorage.#{name}"
-        unless storage?
-            storage = "{}"
-
-        try
-            storage = JSON.parse storage
-        catch e
-            storage = {}
-        
-        return new StorageDOM @, name, storage
-
-    #---------------------------------------------------------------------------
-    _store: (name, storage) ->
-        try 
-            storage = JSON.stringify storage
-        catch e
-            return
-
-        @domStorage.setItem "cloudStorage.#{name}", storage
-
-    #---------------------------------------------------------------------------
-    _delete: (name) ->
-
-        @domStorage.removeItem "cloudStorage.#{name}"
+        return new StorageDOM @, name, @_domStorage
 
 #-------------------------------------------------------------------------------
 class StorageDOM
 
     #---------------------------------------------------------------------------
-    constructor: (@manager, @name, @storage) ->
+    constructor: (@_manager, @_name, @_domStorage) ->
 
     #---------------------------------------------------------------------------
     keys: (callback) ->
         {callback, result} = getCallbackAndResult callback
 
-        returnedKeys = []
+        pattern = /cloudStorage\.(.*?)\.(.*)/
 
-        for key, val of @storage
+        keys = {}
+        for i in [0...@_domStorage.length]
+            key = @_domStorage.key i
+
+            match = key.match pattern
+            continue unless match
+            continue unless match[1] is @_name
+
+            keys[":#{match[2]}"] = true
+
+        returnedKeys = []
+        for key, ignored of keys
             returnedKeys.push key.substr 1
 
         process.nextTick -> callback null, returnedKeys
@@ -93,9 +80,16 @@ class StorageDOM
     get: (key, callback) ->
         {callback, result} = getCallbackAndResult callback
 
-        result = @storage[":#{key}"]
+        skey  = "cloudStorage.#{@_name}.#{key}"
+        value = @_domStorage.getItem skey
 
-        process.nextTick -> callback null, result
+        try
+            value = JSON.parse value
+        catch e
+            process.nextTick -> callback e
+            return result
+
+        process.nextTick -> callback null, value
 
         return result
 
@@ -103,8 +97,15 @@ class StorageDOM
     put: (key, value, callback) ->
         {callback, result} = getCallbackAndResult callback
 
-        @storage[":#{key}"] = value
-        @manager._store @name, @storage
+        skey = "cloudStorage.#{@_name}.#{key}"
+
+        try
+            value = JSON.stringify value
+        catch e
+            process.nextTick -> callback e
+            return result
+
+        @_domStorage.setItem skey, value
 
         process.nextTick -> callback()
 
@@ -114,8 +115,8 @@ class StorageDOM
     del: (key, callback) ->
         {callback, result} = getCallbackAndResult callback
 
-        delete @storage[":#{key}"]
-        @manager._store @name, @storage
+        skey = "cloudStorage.#{@_name}.#{key}"
+        @_domStorage.removeItem skey
 
         process.nextTick -> callback()
 
@@ -125,10 +126,12 @@ class StorageDOM
     clear: (callback) ->
         {callback, result} = getCallbackAndResult callback
 
-        @storage = {}
-        @manager._delete @name
+        @keys (err, keys) =>
+            for key in keys
+                skey = "cloudStorage.#{@_name}.#{key}"
+                @_domStorage.removeItem skey
 
-        process.nextTick -> callback()
+            callback()
 
         return result
 
