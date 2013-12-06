@@ -19,31 +19,43 @@ cloudStorage manages storage objects.  A storage object is basically a Map or
 Dictionary.  It contains a number of key/value pairs, where the keys are 
 strings and the values are JSON-able objects.  You can get/set/delete 
 key value pairs in the usual way, and you can obtain an array of all 
-the keys.  You can also remove all the keys/value pairs with the `clear()`
-method.
+the keys.  You can also clear all the key/value pairs at once.
 
-There are three flavors of storage objects: "local", "session", and "remote".
+There are two flavors of storage objects: browser and remote.
 
-"local" and "session" map storage objects to a key/valure pair in 
-`window.localStorage` and `window.sessionStorage`.
+Browser storage objecs map storage objects to a key/value pairs in 
+browser-persisted storage, like `window.localStorage` and 
+`window.sessionStorage`.
 
-"remote" storage objects are stored on a server.  To use a remote storage
+Remote storage objects are stored on a server.  To use a remote storage
 object, you will likely have to be "logged in" to the server.  You can
 obtain the currently logged in user with the `getUser()` method of the
-storage manager.  The user object returned by that call has an `id` field
-which is the value that should be used as `userid` in subsequent 
-cloudStorage method invocations.  Note that they don't **HAVE** to be the 
-same.  If they're different, then you are attempting to access
-someone else's storage objects.  Which may be fine, or may not be fine,
-depending on the storage manager.
+storage manager.
+
+Storage objects can be obtained from a storage manager.
+
 
 
 browser api
 ================================================================================
 
-After including the `cloudStorage.js` API, you will have a new global object
+After including the `cloudStorage.js` API, you will have a new object
 available globally (installed as a property of the `window` object) named
 `cloudStorage`.
+
+For all methods which take a callback parameter,
+you can instead not pass a callback function, 
+in which case a promise will be returned from the method.
+When a callback function is passed, null will be returned from the method.
+
+All functions that take callbacks expect the callback to have the signature:
+
+    callback(err, value)
+
+where `err` is an error, in the case of an error, and `value` is the
+relevant value of the method.
+
+Promises will resolved with `value`, and be rejected with `err`.
 
 
 
@@ -60,17 +72,27 @@ string; the [semver](http://semver.org/) version of cloudStorage in use.
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
-`getStorageManager(url)` 
+`browserStorageManager(type)`
 
-Returns a storage object for the signed in user.
+Returns a StorageManager object for the specified browser storage type.
 
-* type - one of "user", "local", or an "http://" or "https://" URL
+* type - "local" | "session"
 
-* name - a string naming this storage object
+This storage manager persists to localStorage and sessionStorage.
 
-When type is "local", the storage object is mapped onto window.localStorage.
-When type is "session", the storage object is mapped onto window.sessionStorage.
-Otherwise the type should be an http:// or https:// URL.
+The `userid` parameter on the StorageManager methods is ignored.
+
+The user returned from `StorageManager.getUser()` will be null.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+`remoteStorageManager(url)` 
+
+* url - url to remoteStorage server
+
+Returns a StorageManager object for the specified userid and url.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
 
 
@@ -97,12 +119,20 @@ managers which don't support users.
 
 Return the names of the available storage objects.
 
-* `userid` - the userid of the storage objects to be processed
+* `userid` - the userid of the storage objects to be accessed
 
 * `callback(err, names)`
     * `err` - an Error object when an error occurs, or null if no error occurred
     * `names` - an array of strings
 
+The `userid` parameter is ignored for browser storage managers.
+
+The `userid` does not necessarily have to be the same as the `id` field
+of the user object returned by `getUser()`.  `getUser()` returns the 
+logged in user; the `userid` parameter specifies the storage objects
+to be accessed.  When different, it means the logged in user is attempting
+to access storage owned by `userid`.  The storage manager may or may not
+allow this access.
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
@@ -110,11 +140,21 @@ Return the names of the available storage objects.
 
 Return a storage object with the specified name.
 
-* `userid` - the userid of the storage objects to be processed
+* `userid` - the userid of the storage objects to be accessed
 
 * `name` - the name of the storage object to access
 
+The `userid` parameter is ignored for browser storage managers.
+
+The `userid` does not necessarily have to be the same as the `id` field
+of the user object returned by `getUser()`.  `getUser()` returns the 
+logged in user; the `userid` parameter specifies the storage objects
+to be accessed.  When different, it means the logged in user is attempting
+to access storage owned by `userid`.  The storage manager may or may not
+allow this access.
+
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
 
 
 Storage objects

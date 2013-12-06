@@ -4,26 +4,31 @@
 path  = require "path"
 
 _       = require "underscore"
+Q       = require "q"
 cookies = require "cookies-js"
 
 #-------------------------------------------------------------------------------
 exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
-    constructor: (@url) ->
-        @xsrfToken = cookies.get "XSRF-TOKEN"
+    constructor: (@_url) ->
+        @_xsrfToken   = cookies.get "XSRF-TOKEN"
 
     #---------------------------------------------------------------------------
     getUser: (callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         @_xhr "GET", "user", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.user
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     getStorageNames: (userid, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         userid = encodeURIComponent userid
 
         @_xhr "GET", "/u/#{userid}/s", null, (err, response) ->
@@ -31,7 +36,7 @@ exports.storageManager = class StorageManagerRemote
 
             callback null, response.bodyObject?.storageNames
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     getStorage: (userid, name) ->
@@ -63,7 +68,7 @@ exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
     _xhr: (method, uri, requestBody, callback) ->
-        url = path.join @url, uri
+        url = path.join @_url, uri
 
         xhr = new XMLHttpRequest
 
@@ -72,7 +77,7 @@ exports.storageManager = class StorageManagerRemote
         xhr.open method, url, true
         xhr.setRequestHeader "Accept",       "application/json"
         xhr.setRequestHeader "Content-Type", "application/json" if requestBody?
-        xhr.setRequestHeader "X-XSRF-TOKEN", @xsrfToken         if @xsrfToken?
+        xhr.setRequestHeader "X-XSRF-TOKEN", @_xsrfToken        if @_xsrfToken?
 
         if requestBody
             xhr.send requestBody
@@ -86,73 +91,70 @@ class StorageRemote
 
     #---------------------------------------------------------------------------
     constructor: (@manager, userid, name) ->
-        @userid = encodeURIComponent userid
-        @name   = encodeURIComponent name
+        @_userid = encodeURIComponent userid
+        @_name   = encodeURIComponent name
+        @_meta   = {}
 
     #---------------------------------------------------------------------------
     keys: (callback) ->
-        @manager._xhr "GET", "/u/#{@userid}/s/#{@name}", null, (err, response) ->
+        {callback, result} = getCallbackAndResult callback
+
+        @manager._xhr "GET", "/u/#{@_userid}/s/#{@_name}", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.keys
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     get: (key, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         key = encodeURIComponent key
-        @manager._xhr "GET", "/u/#{@userid}/s/#{@name}/#{key}", null, (err, response) ->
+        @manager._xhr "GET", "/u/#{@_userid}/s/#{@_name}/#{key}", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.value
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     put: (key, value, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         key   = encodeURIComponent key
         value = JSON.stringify {value}
-        @manager._xhr "PUT", "/u/#{@userid}/s/#{@name}/#{key}", value, (err, response) ->
+
+        @manager._xhr "PUT", "/u/#{@_userid}/s/#{@_name}/#{key}", value, (err, response) ->
             return callback err if err?
 
             callback()
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     del: (key, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         key = encodeURIComponent key
 
-        @manager._xhr "DELETE", "/u/#{@userid}/s/#{@name}/#{key}", null, (err, response) ->
+        @manager._xhr "DELETE", "/u/#{@_userid}/s/#{@_name}/#{key}", null, (err, response) ->
             return callback err if err?
 
             callback()
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     clear: (callback) ->
-        @manager._xhr "DELETE", "/u/#{@userid}/s/#{@name}", null, (err, response) ->
+        {callback, result} = getCallbackAndResult callback
+
+        @manager._xhr "DELETE", "/u/#{@_userid}/s/#{@_name}", null, (err, response) ->
             return callback err if err?
 
             callback()
 
-        return null
-
-#-------------------------------------------------------------------------------
-httpError = (response) ->
-    error = new Error "unexpected http response"
-    error.response = response
-    return error
-
-#-------------------------------------------------------------------------------
-resolveURL = (url) ->
-
-    {protocol, host, pathname} = window.location
-
-    windowURL = "#{protocol}//#{host}#{pathname}"
-
-    return URL.resolve windowURL, url
+        return result
 
 #-------------------------------------------------------------------------------
 errorResult = (name, message) ->
@@ -160,6 +162,23 @@ errorResult = (name, message) ->
     err.name = name
 
     err
+
+#-------------------------------------------------------------------------------
+getCallbackAndResult = (callback) ->
+    result = null
+
+    return {callback, result} if _.isFunction callback
+
+    deferred = Q.defer()
+    result   = deferred.promise
+
+    callback = (err, value) ->
+        if err?
+            deferred.reject err
+        else
+            deferred.resolve value
+
+    return {callback, result}
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

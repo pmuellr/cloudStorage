@@ -15,26 +15,21 @@ remoteStorage = require "./remoteStorage"
 window.cloudStorage = exports
 
 #-------------------------------------------------------------------------------
-StorageManagers = {}
-
-#-------------------------------------------------------------------------------
 cloudStorage.version = pkg.version
 
 #-------------------------------------------------------------------------------
-cloudStorage.getStorageManager = (url) ->
-    return StorageManagers[url] if StorageManagers[url]?
+cloudStorage.browserStorageManager = (type) ->
+    switch type
+        when "local" 
+            return new domStorage.storageManager window.localStorage
+        when "session"
+            return new domStorage.storageManager window.sessionStorage
+        else
+            throw Error "invalid type: #{type}"
 
-    if url is "local"
-        storageManager = new domStorage.storageManager window.localStorage
-    else if url is "session"
-        storageManager = new domStorage.storageManager window.sessionStorage
-    else
-        storageManager = new remoteStorage.storageManager url
-
-    StorageManagers[url] = storageManager
-
-    return storageManager
-
+#-------------------------------------------------------------------------------
+cloudStorage.remoteStorageManager = (userid, url) ->
+    return new remoteStorage.storageManager userid, url
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

@@ -1,6 +1,7 @@
 # Licensed under the Apache License. See footer for details.
 
 _ = require "underscore"
+Q = require "q"
 
 #-------------------------------------------------------------------------------
 exports.storageManager = class StorageManagerDOM 
@@ -10,13 +11,16 @@ exports.storageManager = class StorageManagerDOM
 
     #---------------------------------------------------------------------------
     getUser: (callback) ->
-        process.nextTick -> 
-            callback() if _.isFunction callback
+        {callback, result} = getCallbackAndResult callback
 
-        return null
+        process.nextTick -> callback()
+
+        return result
 
     #---------------------------------------------------------------------------
     getStorageNames: (userid, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         names = {}
 
         pattern = /cloudStorage\.(.*)/
@@ -30,14 +34,13 @@ exports.storageManager = class StorageManagerDOM
             name = ":#{match[1]}"
             names[name] = true
 
-        result = []
+        returnedNames = []
         for own name, ignored of names
-            result.push name.substr 1
+            returnedNames.push name.substr 1
 
-        process.nextTick ->
-            callback null, result
+        process.nextTick -> callback null, returnedNames
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     getStorage: (userid, name) ->
@@ -75,54 +78,76 @@ class StorageDOM
 
     #---------------------------------------------------------------------------
     keys: (callback) ->
-        result = []
+        {callback, result} = getCallbackAndResult callback
+
+        returnedKeys = []
 
         for key, val of @storage
-            result.push key.substr 1
+            returnedKeys.push key.substr 1
 
-        process.nextTick ->
-            callback null, result if callback?
+        process.nextTick -> callback null, returnedKeys
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     get: (key, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         result = @storage[":#{key}"]
 
-        process.nextTick ->
-            callback null, result if callback?
+        process.nextTick -> callback null, result
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     put: (key, value, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         @storage[":#{key}"] = value
         @manager._store @name, @storage
 
-        process.nextTick ->
-            callback null if callback?
+        process.nextTick -> callback()
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     del: (key, callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         delete @storage[":#{key}"]
         @manager._store @name, @storage
 
-        process.nextTick ->
-            callback null if callback?
+        process.nextTick -> callback()
 
-        return null
+        return result
 
     #---------------------------------------------------------------------------
     clear: (callback) ->
+        {callback, result} = getCallbackAndResult callback
+
         @storage = {}
         @manager._delete @name
 
-        process.nextTick ->
-            callback null if callback?
+        process.nextTick -> callback()
 
-        return null
+        return result
+
+#-------------------------------------------------------------------------------
+getCallbackAndResult = (callback) ->
+    result = null
+
+    return {callback, result} if _.isFunction callback
+
+    deferred = Q.defer()
+    result   = deferred.promise
+
+    callback = (err, value) ->
+        if err?
+            deferred.reject err
+        else
+            deferred.resolve value
+
+    return {callback, result}
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

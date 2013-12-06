@@ -6,14 +6,10 @@ describe "version", ->
         expect(cloudStorage.version).to.match /^\d+\.\d+\.\d+(.*)$/
 
 #-------------------------------------------------------------------------------
-runTests = (url, userid) ->
-
-    storageMgr = null
+runTests = (storageMgr, userid) ->
 
     #----------------------------------
     before (done) ->
-        storageMgr = cloudStorage.getStorageManager url
-
         storageMgr.getStorageNames userid, (err, names) ->
             return done err if err?
 
@@ -40,13 +36,11 @@ runTests = (url, userid) ->
         storageMgr.getUser (err, user) ->
             return done err if err?
 
-            try 
+            trycatch done, ->  
                 if userid?
                     expect(user.id).to.eql(userid)
                 else
                     expect(user).to.eql(userid)
-            catch 
-                return done e
 
             done()
 
@@ -55,10 +49,7 @@ runTests = (url, userid) ->
         storageMgr.getStorageNames userid, (err, names) ->
             return done err if err?
 
-            try 
-                expect(names).to.be.empty()
-            catch e 
-                return done e
+            trycatch done, -> expect(names).to.be.empty()
 
             done()
 
@@ -79,10 +70,7 @@ runTests = (url, userid) ->
         storage.get "a-key", (err, value) ->
             return done err if err?
 
-            try 
-                expect(value?).to.not.be.ok()
-            catch e 
-                return done e
+            trycatch done, -> expect(value?).to.not.be.ok()
 
             done()
 
@@ -96,12 +84,52 @@ runTests = (url, userid) ->
 
             storage.get "a-key", (err, value) ->
 
-                try 
-                    expect(value).to.be "a-value"
-                catch e 
-                    return done e
+                trycatch done, -> expect(value).to.be "a-value"
 
                 done()
+
+    #----------------------------------
+    it "should create path-escapble users, storage names and keys", (done) ->
+
+        storage = storageMgr.getStorage "/\//", "/"
+
+        storage.put "::/::", "//://", (err) ->
+            return done err if err?
+
+            storage.get "::/::", (err, value) ->
+
+                trycatch done, -> expect(value).to.be "//://"
+
+                done()
+
+    #----------------------------------
+    it "should read path-escapble storage names", (done) ->
+
+        storageMgr.getStorageNames "/\//", (err, names) ->
+            return done err if err?
+
+            for name in names
+                return done() if name is "/"
+
+
+            trycatch done, -> expect().fail()
+
+            done()
+
+    #----------------------------------
+    it "should read path-escapble keys names", (done) ->
+
+        storage = storageMgr.getStorage "/\//", "/"
+
+        storage.keys (err, keys) ->
+            return done err if err?
+
+            for key in keys
+                return done() if key is "::/::"
+
+            trycatch done, -> expect().fail()
+
+            done()
 
     #----------------------------------
     it "should add a key/object successfully", (done) ->
@@ -113,10 +141,7 @@ runTests = (url, userid) ->
 
             storage.get "b-key", (err, value) ->
 
-                try 
-                    expect(value).to.eql {b: "value"}
-                catch e 
-                    return done e
+                trycatch done, -> expect(value).to.eql {b: "value"}
 
                 done()
 
@@ -128,13 +153,11 @@ runTests = (url, userid) ->
         storage.keys (err, keys) ->
             return done err if err?
 
-            try
+            trycatch done, -> 
                 keys.sort()
                 expect(keys).to.have.length 2
                 expect(keys[0]).to.be "a-key"  
                 expect(keys[1]).to.be "b-key"  
-            catch e
-                return done e
 
             done()
 
@@ -149,11 +172,9 @@ runTests = (url, userid) ->
             storage.keys (err, keys) ->
                 return done err if err?
 
-                try
+                trycatch done, -> 
                     expect(keys).to.have.length 1
                     expect(keys[0]).to.be "a-key"  
-                catch e
-                    return done e
 
                 done()
 
@@ -168,23 +189,98 @@ runTests = (url, userid) ->
             storage.keys (err, keys) ->
                 return done err if err?
 
-                try
-                    expect(keys).to.have.length 0
-                catch e
-                    return done e
+                trycatch done, -> expect(keys).to.have.length 0
 
                 done()
 
+    #----------------------------------
+    it "should handle promises: getUser()", (done) ->
+        p = storageMgr.getUser()
+        p.then (user) -> 
+            trycatch done, ->  
+                if userid?
+                    expect(user.id).to.eql userid
+                else
+                    expect(user).to.eql userid
+        p.then done()
+        p.fail (err) -> done(err)
+        return
+
+    #----------------------------------
+    it "should handle promises: getStorageNames()", (done) ->
+        p = storageMgr.getStorageNames userid
+
+        p.then (names) -> trycatch(done, -> expect(names).to.be.an Array)
+        p.then done()
+        p.fail (err) -> done(err)
+        return
+
+    #----------------------------------
+    it "should handle promises: get()/put()", (done) ->
+        storage = storageMgr.getStorage userid, "test-promise"
+
+        p0 = storage.put "p", "q"
+        p1 = p0.then -> storage.get "p"
+        p1.then (value) -> trycatch(done, -> expect(value).to.be "q")
+        p1.then done()
+        p1.fail (err) -> done(err) 
+        return
+
+    #----------------------------------
+    it "should handle promises: del()", (done) ->
+        storage = storageMgr.getStorage userid, "test-promise"
+
+        p0 = storage.del "p"
+        p1 = p0.then -> storage.get "p"
+        p1.then (value) -> trycatch(done, -> expect(value).to.eql null)
+        p1.then done()
+        p1.fail (err) -> done(err) 
+        return
+
+    #----------------------------------
+    it "should handle promises: keys()", (done) ->
+        storage = storageMgr.getStorage userid, "test-promise"
+
+        p0 = storage.put "p", "q"
+        p1 = p0.then -> storage.keys()
+        p1.then (keys) -> trycatch(done, -> expect(value).to.eql ["p"])
+        p1.then done()
+        p1.fail (err) -> done(err) 
+        return
+
+    #----------------------------------
+    it "should handle promises: clear()", (done) ->
+        storage = storageMgr.getStorage userid, "test-promise"
+
+        p0 = storage.clear()
+        p1 = p0.then -> storage.keys()
+        p1.then (keys) -> trycatch(done, -> expect(value).to.eql [])
+        p1.then done()
+        p1.fail (err) -> done(err) 
+        return
+
+
+#-------------------------------------------------------------------------------
+trycatch = (done, fn) ->
+    try
+        fn()
+    catch e
+        done(e)
+    
+
 #-------------------------------------------------------------------------------
 describe "local", ->
-    runTests "local"
+    storageManager = cloudStorage.browserStorageManager "local"
+    runTests storageManager
 
 #-------------------------------------------------------------------------------
 describe "session", ->
-    runTests "session"
+    storageManager = cloudStorage.browserStorageManager "session"
+    runTests storageManager
 
 #-------------------------------------------------------------------------------
 describe "remote - global", ->
-    runTests "cloudStorage/global", "anonymous"
+    storageManager = cloudStorage.remoteStorageManager "cloudStorage/global"
+    runTests storageManager, "anonymous"
 
 

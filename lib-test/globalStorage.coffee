@@ -36,7 +36,8 @@ exports.storageManager = class StorageManagerGlobal
         names = {}
 
         for key, ignored of @_storages
-            names[":#{key}"] = true
+            continue if key[0] isnt ":"
+            names[key] = true
 
         result = []
         for own name, ignored of names
@@ -45,6 +46,8 @@ exports.storageManager = class StorageManagerGlobal
         process.nextTick ->
             callback null, result
 
+        console.log "getStorageNames(#{user}) -> #{JSON.stringify(result)}" 
+
         return null
 
     #---------------------------------------------------------------------------
@@ -52,11 +55,14 @@ exports.storageManager = class StorageManagerGlobal
         result = []
         storage = @_storages[":#{name}"] || {}
 
-        for key, val of storage
+        for key, ignored of storage
+            continue if key[0] isnt ":"
             result.push key.substr 1
 
         process.nextTick ->
             callback null, result if callback?
+
+        console.log "keys(#{user},#{name}) -> #{JSON.stringify(result)}" 
 
         return null
 
