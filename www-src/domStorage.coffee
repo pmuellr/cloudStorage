@@ -1,173 +1,130 @@
 # Licensed under the Apache License. See footer for details.
 
 _ = require "underscore"
-Q = require "q"
 
 #-------------------------------------------------------------------------------
-exports.storageManager = class StorageManagerDOM 
+exports.StorageDriver = class DomStorageDriver
 
     #---------------------------------------------------------------------------
     constructor: (@_domStorage) ->
 
     #---------------------------------------------------------------------------
     getUser: (callback) ->
-        {callback, result} = getCallbackAndResult callback
-
         process.nextTick -> callback()
-
-        return result
+        return
 
     #---------------------------------------------------------------------------
     getStorageNames: (userid, callback) ->
-        {callback, result} = getCallbackAndResult callback
+        forUserid = userid
 
-        names = {}
-
+        names = new Set()
         for i in [0...@_domStorage.length]
-            {name, key} = storageKeyParse @_domStorage.key i
+            {userid, name, key} = storageKeyParse @_domStorage.key i
 
-            continue unless name? and key?
+            continue unless userid is forUserid
 
-            names[":#{name}"] = true
+            names.add name
 
-        returnedNames = []
-        for own name, ignored of names
-            returnedNames.push name.substr 1
-
-        process.nextTick -> callback null, returnedNames
-
-        return result
+        process.nextTick -> callback null, names.items()
+        return
 
     #---------------------------------------------------------------------------
-    getStorage: (userid, name) ->
-        throw Error "invalid name" if name.match /^\.+$/
+    keys: (userid, name, callback) ->
+        forUserid = userid
+        forName   = name
 
-        return new StorageDOM @, name, @_domStorage
-
-#-------------------------------------------------------------------------------
-class StorageDOM
-
-    #---------------------------------------------------------------------------
-    constructor: (@_manager, @_name, @_domStorage) ->
-
-    #---------------------------------------------------------------------------
-    keys: (callback) ->
-        {callback, result} = getCallbackAndResult callback
-
-        keys = {}
+        keys = new Set()
         for i in [0...@_domStorage.length]
-            {name, key} = storageKeyParse @_domStorage.key i
+            {userid, name, key} = storageKeyParse @_domStorage.key i
 
-            continue unless (name is @_name) and key?
+            continue unless userid is forUserid
+            continue unless name   is forName
 
-            keys[":#{key}"] = true
+            keys.add key
 
-        returnedKeys = []
-        for key, ignored of keys
-            returnedKeys.push key.substr 1
-
-        process.nextTick -> callback null, returnedKeys
-
-        return result
+        process.nextTick -> callback null, keys.items()
+        return
 
     #---------------------------------------------------------------------------
-    get: (key, callback) ->
-        throw Error "invalid key" if key.match /^\.+$/
-
-        {callback, result} = getCallbackAndResult callback
-
-        skey  = storageKeyGenerate @_name, key
+    get: (userid, name, key, callback) ->
+        skey  = storageKeyGenerate userid, name, key
         value = @_domStorage.getItem skey
 
-        try
-            value = JSON.parse value
-        catch e
-            process.nextTick -> callback e
-            return result
-
         process.nextTick -> callback null, value
-
-        return result
+        return
 
     #---------------------------------------------------------------------------
-    put: (key, value, callback) ->
-        throw Error "invalid key" if key.match /^\.+$/
-
-        {callback, result} = getCallbackAndResult callback
-
-        skey  = storageKeyGenerate @_name, key
-
-        try
-            value = JSON.stringify value
-        catch e
-            process.nextTick -> callback e
-            return result
+    put: (userid, name, key, value, callback) ->
+        skey  = storageKeyGenerate userid, name, key
 
         @_domStorage.setItem skey, value
 
         process.nextTick -> callback()
-
-        return result
+        return
 
     #---------------------------------------------------------------------------
-    del: (key, callback) ->
-        throw Error "invalid key" if key.match /^\.+$/
-
-        {callback, result} = getCallbackAndResult callback
-
-        skey  = storageKeyGenerate @_name, key
+    del: (userid, name, key, callback) ->
+        skey  = storageKeyGenerate userid, name, key
         @_domStorage.removeItem skey
 
         process.nextTick -> callback()
-
-        return result
+        return
 
     #---------------------------------------------------------------------------
-    clear: (callback) ->
-        {callback, result} = getCallbackAndResult callback
-
-        @keys (err, keys) =>
+    clear: (userid, name, callback) ->
+        @keys userid, name, (err, keys) =>
             for key in keys
-                skey  = storageKeyGenerate @_name, key
+                skey  = storageKeyGenerate userid, name, key
                 @_domStorage.removeItem skey
 
             callback()
 
-        return result
+        return
 
 #-------------------------------------------------------------------------------
-storageKeyGenerate = (name, key) ->
-    "cloudStorage/#{encodeURIComponent name}/#{encodeURIComponent key}"
+storageKeyGenerate = (userid, name, key) ->
+    "cloudStorage/#{userid}/#{name}/#{key}"
 
 #-------------------------------------------------------------------------------
 storageKeyParse = (skey) ->
-    name = null
-    key  = null
+    userid = null
+    name   = null
+    key    = null
 
-    match = skey.match /cloudStorage\/(.*?)\/(.*)/
-    return {name, key} unless match?
+    match = skey.match /cloudStorage\/(.*?)\/(.*?)\/(.*)/
+    return {userid, name, key} unless match?
 
-    name  = decodeURIComponent match[1]
-    key   = decodeURIComponent match[2]
+    userid  = match[1]
+    name    = match[2]
+    key     = match[3]
 
-    {name, key}
+    {userid, name, key}
 
 #-------------------------------------------------------------------------------
-getCallbackAndResult = (callback) ->
-    result = null
+getInvalidJSONError = ->
+    err = new Error message
+    err.name = "CloudStorage.InvalidJSON"
 
-    return {callback, result} if _.isFunction callback
+    err
 
-    deferred = Q.defer()
-    result   = deferred.promise
+#-------------------------------------------------------------------------------
+class Set
 
-    callback = (err, value) ->
-        if err?
-            deferred.reject err
-        else
-            deferred.resolve value
+    #---------------------------------------------------------------------------
+    constructor: () ->
+        @_keys = {}
 
-    return {callback, result}
+    #---------------------------------------------------------------------------
+    add: (key) ->
+        @_keys[":#{key}"] = true
+        return @
+
+    #---------------------------------------------------------------------------
+    items: () ->
+        result = []
+        for own key, ignored of @_keys
+            result.push key.substr 1
+        result
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

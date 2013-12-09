@@ -30,9 +30,9 @@ exports.run = ->
     # storageMiddleware.use dumpRequest "subapp"
     storageMiddleware.use express.json()
 
-    storageManager = new globalStorage.storageManager
+    storageDriver = new globalStorage.storageDriver
 
-    cloudStorage.configure storageMiddleware, storageManager
+    cloudStorage.configure storageMiddleware, storageDriver
 
     # main app
     app = express()

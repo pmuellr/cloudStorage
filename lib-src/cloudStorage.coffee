@@ -2,28 +2,55 @@
 
 path = require "path"
 
+_ = require "underscore"
+
 cloudStorage = exports
 
 #-------------------------------------------------------------------------------
-cloudStorage.configure = (app, storageManager) ->
-    handler = new Handler storageManager
+cloudStorage.configure = (app, storageDriver) ->
+    checkStorageDriver storageDriver
 
-    app.all    "*", setCloudStorage(handler)
+    app.all "*", setUserid storageDriver
 
-    app.get    "/user",                  (req,res)->  handler.getUser         req, res
-    app.get    "/u/:user/s",             (req,res)->  handler.getStorageNames req, res
-    app.get    "/u/:user/s/:name",       (req,res)->  handler.keys            req, res
-    app.delete "/u/:user/s/:name",       (req,res)->  handler.clear           req, res
-    app.get    "/u/:user/s/:name/:key",  (req,res)->  handler.get             req, res
-    app.put    "/u/:user/s/:name/:key",  (req,res)->  handler.put             req, res
-    app.delete "/u/:user/s/:name/:key",  (req,res)->  handler.del             req, res
+    dmw = new DriverMiddleWare storageDriver
+
+    app.get    "/user",                  (req,res)->  dmw.getUser         req, res
+    app.get    "/u/:user/s",             (req,res)->  dmw.getStorageNames req, res
+    app.get    "/u/:user/s/:name",       (req,res)->  dmw.keys            req, res
+    app.delete "/u/:user/s/:name",       (req,res)->  dmw.clear           req, res
+    app.get    "/u/:user/s/:name/:key",  (req,res)->  dmw.get             req, res
+    app.put    "/u/:user/s/:name/:key",  (req,res)->  dmw.put             req, res
+    app.delete "/u/:user/s/:name/:key",  (req,res)->  dmw.del             req, res
 
     return app
 
 #-------------------------------------------------------------------------------
-setCloudStorage = (handler) ->
+checkStorageDriver = (storageDriver) ->
+    methods = [
+        "getUserID"      
+        "getUser"        
+        "getStorageNames"
+        "keys"           
+        "clear"          
+        "get"            
+        "put"            
+        "del"            
+    ]
+
+    for method in methods
+        unless _.isFunction storageDriver[method]
+            return SDMissingMethodError storageDriver, method
+
+    return
+
+#-------------------------------------------------------------------------------
+SDMissingMethodError = (storageDriver, method) ->
+    throw Error "missing method on storageDriver: #{method} (driver: #{storageDriver})"
+
+#-------------------------------------------------------------------------------
+setUserid = (storageDriver) ->
     (request, response, next) ->
-        handler.getUserID request, (err, userid) ->
+        storageDriver.getUserID request, (err, userid) ->
             return response.send errorResult err if err?
 
             request.cloudStorage =
@@ -32,18 +59,22 @@ setCloudStorage = (handler) ->
             next()
 
 #-------------------------------------------------------------------------------
-class Handler 
+class DriverMiddleWare
 
     #---------------------------------------------------------------------------
-    constructor: (@storageManager) ->
+    constructor: (@storageDriver) ->
 
     #---------------------------------------------------------------------------
-    getUserID: (request, callback) ->
-        @storageManager.getUserID request, callback
+    _initTx: (request, response) ->
+        request:  request
+        response: response
+        authUser: request?.cloudStorage?.userid
 
     #---------------------------------------------------------------------------
     getUser: (request, response) ->
-        @storageManager.getUser request, (err, user) ->
+        tx = @_initTx request, response
+
+        @storageDriver.getUser tx, (err, user) ->
             return response.send errorResult err if err?
 
             response.set "Cache-Control", "no-cache"
@@ -55,9 +86,10 @@ class Handler
 
     #---------------------------------------------------------------------------
     getStorageNames: (request, response) ->
+        tx   = @_initTx request, response
         user = request.params.user
 
-        @storageManager.getStorageNames request, user, (err, storageNames) ->
+        @storageDriver.getStorageNames tx, user, (err, storageNames) ->
             return response.send errorResult err if err?
             
             response.send
@@ -68,10 +100,11 @@ class Handler
 
     #---------------------------------------------------------------------------
     keys: (request, response) ->
+        tx   = @_initTx request, response
         user = request.params.user
         name = request.params.name
 
-        @storageManager.keys request, user, name, (err, keys) ->
+        @storageDriver.keys tx, user, name, (err, keys) ->
             return response.send errorResult err if err?
             
             response.send
@@ -82,10 +115,11 @@ class Handler
 
     #---------------------------------------------------------------------------
     clear: (request, response) ->
+        tx   = @_initTx request, response
         user = request.params.user
         name = request.params.name
 
-        @storageManager.clear request, user, name, (err) ->
+        @storageDriver.clear tx, user, name, (err) ->
             return response.send errorResult err if err?
             
             response.send
@@ -95,11 +129,12 @@ class Handler
 
     #---------------------------------------------------------------------------
     get: (request, response) ->
+        tx   = @_initTx request, response
         user = request.params.user
         name = request.params.name
         key  = request.params.key
 
-        @storageManager.get request, user, name, key, (err, value) ->
+        @storageDriver.get tx, user, name, key, (err, value) ->
             return response.send errorResult err if err?
             
             response.send
@@ -112,12 +147,13 @@ class Handler
 
     #---------------------------------------------------------------------------
     put: (request, response) ->
+        tx    = @_initTx request, response
         user  = request.params.user
         name  = request.params.name
         key   = request.params.key
         value = request?.body?.value
 
-        @storageManager.put request, user, name, key, value, (err) ->
+        @storageDriver.put tx, user, name, key, value, (err) ->
             return response.send errorResult err if err?
             
             response.send
@@ -127,11 +163,12 @@ class Handler
 
     #---------------------------------------------------------------------------
     del: (request, response) ->
+        tx   = @_initTx request, response
         user = request.params.user
         name = request.params.name
         key  = request.params.key
 
-        @storageManager.del request, user, name, key, (err, value) ->
+        @storageDriver.del tx, user, name, key, (err, value) ->
             return response.send errorResult err if err?
             
             response.send

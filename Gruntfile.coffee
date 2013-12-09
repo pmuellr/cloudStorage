@@ -115,12 +115,12 @@ build = (task) ->
     cp "lib/builtOn.json", "tmp/www"
     cp "package.json",     "tmp/www"
 
-    args = "--debug --outfile www/cloudStorage.js --entry tmp/www/main.js"
+    args = "--debug --outfile www/cloudstorage-browser.js --entry tmp/www/cloudStorage.js"
 
     log "browserify #{args}"
     browserify args
 
-    coffee "tools/split-sourcemap-data-url.coffee www/cloudStorage.js"
+    coffee "tools/split-sourcemap-data-url.coffee www/cloudstorage-browser.js"
 
     #----------------------------------
     log "building test code in www-test"

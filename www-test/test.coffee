@@ -302,12 +302,17 @@ runTests = (storageMgr, userid) ->
 
     #----------------------------------
     it "should leave some droppings", (done) ->
-        storage = storageMgr.getStorage userid, "test-droppings"
-        p0 =            storage.put "a", "1"
-        p1 = p0.then -> storage.put "b", "2"
-        p2 = p1.then -> storage.put "c", "3"
-        p2.then -> done()
-        p2.fail done
+        storage1 = storageMgr.getStorage userid,        "test-droppings"
+        storage2 = storageMgr.getStorage "test-userid", "test-droppings"
+
+        p0 =            storage1.put "a", "1"
+        p1 = p0.then -> storage1.put "b", "2"
+        p2 = p1.then -> storage1.put "c", "3"
+        p3 = p2.then -> storage2.put "1", "a"
+        p4 = p3.then -> storage2.put "2", "b"
+        p5 = p4.then -> storage2.put "3", "c"
+        p5.then -> done()
+        p5.fail done
 
 
 #-------------------------------------------------------------------------------

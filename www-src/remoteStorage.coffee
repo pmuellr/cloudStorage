@@ -8,7 +8,7 @@ Q       = require "q"
 cookies = require "cookies-js"
 
 #-------------------------------------------------------------------------------
-exports.storageManager = class StorageManagerRemote
+exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     constructor: (@_url) ->
@@ -16,63 +16,70 @@ exports.storageManager = class StorageManagerRemote
 
     #---------------------------------------------------------------------------
     getUser: (callback) ->
-        {callback, result} = getCallbackAndResult callback
-
         @_xhr "GET", "user", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.user
 
-        return result
+        return
 
     #---------------------------------------------------------------------------
     getStorageNames: (userid, callback) ->
-        throw Error "invalid userid" if userid.match /^\.+$/
-
-        {callback, result} = getCallbackAndResult callback
-
-        userid = encodeURIComponent userid
-
         @_xhr "GET", "/u/#{userid}/s", null, (err, response) ->
             return callback err if err?
 
             callback null, response.bodyObject?.storageNames
 
-        return result
+        return
 
     #---------------------------------------------------------------------------
-    getStorage: (userid, name) ->
-        throw Error "invalid userid" if userid.match /^\.+$/
-        throw Error "invalid name"   if name.match   /^\.+$/
+    keys: (userid, name, callback) ->
+        @_xhr "GET", "/u/#{userid}/s/#{name}", null, (err, response) ->
+            return callback err if err?
 
-        return new StorageRemote @, userid, name
+            callback null, response.bodyObject?.keys
+
+        return
 
     #---------------------------------------------------------------------------
-    _xhrOnRSC: (e, callback) ->
-        xhr = e.target
+    get: (userid, name, key, callback) ->
+        @_xhr "GET", "/u/#{userid}/s/#{name}/#{key}", null, (err, response) ->
+            return callback err if err?
 
-        return unless xhr.readyState is 4
+            callback null, response.body
 
-        unless xhr.status is 200
-            message = "invalid HTTP status #{xhr.status}: #{xhr.statusText}"
-            return callback errorResult "ServerError", message
+        return
 
-        contentType = xhr.getResponseHeader "Content-Type"
+    #---------------------------------------------------------------------------
+    put: (userid, name, key, value, callback) ->
+        @_xhr "PUT", "/u/#{userid}/s/#{name}/#{key}", value, (err, response) ->
+            return callback err if err?
 
-        response = 
-            body: xhr.response
+            callback()
 
-        if contentType.match /json/
-            try
-                response.bodyObject = JSON.parse response.body
-            catch e
-                message = "invalid JSON sent from server"
-                return callback errorResult "ServerError", message
+        return
 
-        callback null, response
+    #---------------------------------------------------------------------------
+    del: (userid, name, key, callback) ->
+        @_xhr "DELETE", "/u/#{userid}/s/#{name}/#{key}", null, (err, response) ->
+            return callback err if err?
+
+            callback()
+
+        return
+
+    #---------------------------------------------------------------------------
+    clear: (userid, name, callback) ->
+        @_xhr "DELETE", "/u/#{userid}/s/#{name}", null, (err, response) ->
+            return callback err if err?
+
+            callback()
+
+        return
 
     #---------------------------------------------------------------------------
     _xhr: (method, uri, requestBody, callback) ->
+
         url = path.join @_url, uri
 
         xhr = new XMLHttpRequest
@@ -91,105 +98,43 @@ exports.storageManager = class StorageManagerRemote
 
         return
 
-#-------------------------------------------------------------------------------
-class StorageRemote
-
     #---------------------------------------------------------------------------
-    constructor: (@manager, userid, name) ->
-        @_userid = encodeURIComponent userid
-        @_name   = encodeURIComponent name
-        @_meta   = {}
+    _xhrOnRSC: (e, callback) ->
+        xhr = e.target
 
-    #---------------------------------------------------------------------------
-    keys: (callback) ->
-        {callback, result} = getCallbackAndResult callback
+        return unless xhr.readyState is 4
 
-        @manager._xhr "GET", "/u/#{@_userid}/s/#{@_name}", null, (err, response) ->
-            return callback err if err?
+        unless xhr.status in [200, 304, 401, 404]
+            err = getServerError "invalid HTTP status #{xhr.status}: #{xhr.statusText}"
+            return callback err
 
-            callback null, response.bodyObject?.keys
+        contentType = xhr.getResponseHeader "Content-Type"
 
-        return result
+        response = 
+            body: xhr.response
 
-    #---------------------------------------------------------------------------
-    get: (key, callback) ->
-        throw Error "invalid key" if key.match /^\.+$/
+        if contentType.match /json/
+            try
+                response.bodyObject = JSON.parse response.body
+            catch e
+                err = getInvalidJSONError "invalid JSON sent from server"
+                return callback err
 
-        {callback, result} = getCallbackAndResult callback
-
-        key = encodeURIComponent key
-        @manager._xhr "GET", "/u/#{@_userid}/s/#{@_name}/#{key}", null, (err, response) ->
-            return callback err if err?
-
-            callback null, response.bodyObject?.value
-
-        return result
-
-    #---------------------------------------------------------------------------
-    put: (key, value, callback) ->
-        throw Error "invalid key" if key.match /^\.+$/
-        
-        {callback, result} = getCallbackAndResult callback
-
-        key   = encodeURIComponent key
-        value = JSON.stringify {value}
-
-        @manager._xhr "PUT", "/u/#{@_userid}/s/#{@_name}/#{key}", value, (err, response) ->
-            return callback err if err?
-
-            callback()
-
-        return result
-
-    #---------------------------------------------------------------------------
-    del: (key, callback) ->
-        throw Error "invalid key" if key.match /^\.+$/
-        
-        {callback, result} = getCallbackAndResult callback
-
-        key = encodeURIComponent key
-
-        @manager._xhr "DELETE", "/u/#{@_userid}/s/#{@_name}/#{key}", null, (err, response) ->
-            return callback err if err?
-
-            callback()
-
-        return result
-
-    #---------------------------------------------------------------------------
-    clear: (callback) ->
-        {callback, result} = getCallbackAndResult callback
-
-        @manager._xhr "DELETE", "/u/#{@_userid}/s/#{@_name}", null, (err, response) ->
-            return callback err if err?
-
-            callback()
-
-        return result
+        callback null, response
 
 #-------------------------------------------------------------------------------
-errorResult = (name, message) ->
+getServerError = (message) ->
     err = new Error message
-    err.name = name
+    err.name = "CloudStorage.ServerError"
 
     err
 
 #-------------------------------------------------------------------------------
-getCallbackAndResult = (callback) ->
-    result = null
+getInvalidJSONError = (message) ->
+    err = new Error message
+    err.name = "CloudStorage.InvalidJSON"
 
-    return {callback, result} if _.isFunction callback
-
-    deferred = Q.defer()
-    result   = deferred.promise
-
-    callback = (err, value) ->
-        if err?
-            deferred.reject err
-        else
-            deferred.resolve value
-
-    return {callback, result}
+    err
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller

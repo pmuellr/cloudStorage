@@ -11,33 +11,33 @@ User =
     ]
 
 #-------------------------------------------------------------------------------
-exports.storageManager = class StorageManagerGlobal
+exports.storageDriver = class GlobalStorageDriver
 
     #---------------------------------------------------------------------------
     constructor: ->
         @_storages = {}
 
     #---------------------------------------------------------------------------
-    getUserID: (request, callback) ->
+    toString: ->
+        @constructor.name
+
+    #---------------------------------------------------------------------------
+    getUserID: (tx, callback) ->
         process.nextTick -> 
             callback null, User.id
 
         return
 
     #---------------------------------------------------------------------------
-    getUser: (request, callback) ->
+    getUser: (tx, callback) ->
         process.nextTick -> 
             callback null, User
 
         return
 
     #---------------------------------------------------------------------------
-    getStorageNames: (request, user, callback) ->
-        names = {}
-
-        for key, ignored of @_storages
-            continue if key[0] isnt ":"
-            names[key] = true
+    getStorageNames: (tx, user, callback) ->
+        names = @_storages[":#{user}"] || {}
 
         result = []
         for own name, ignored of names
@@ -46,29 +46,24 @@ exports.storageManager = class StorageManagerGlobal
         process.nextTick ->
             callback null, result
 
-        console.log "getStorageNames(#{user}) -> #{JSON.stringify(result)}" 
-
         return null
 
     #---------------------------------------------------------------------------
-    keys: (request, user, name, callback) ->
+    keys: (tx, user, name, callback) ->
         result = []
-        storage = @_storages[":#{name}"] || {}
+        storage = @_getStorage tx, user, name
 
         for key, ignored of storage
-            continue if key[0] isnt ":"
             result.push key.substr 1
 
         process.nextTick ->
             callback null, result if callback?
 
-        console.log "keys(#{user},#{name}) -> #{JSON.stringify(result)}" 
-
         return null
 
     #---------------------------------------------------------------------------
-    get: (request, user, name, key, callback) ->
-        storage = @_storages[":#{name}"] || {}
+    get: (tx, user, name, key, callback) ->
+        storage = @_getStorage tx, user, name
         result  = storage[":#{key}"]
 
         process.nextTick ->
@@ -77,11 +72,10 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    put: (request, user, name, key, value, callback) ->
-        storage = @_storages[":#{name}"] || {}
+    put: (tx, user, name, key, value, callback) ->
+        storage = @_getStorage tx, user, name
 
         storage[":#{key}"] = value
-        @_store name, storage
 
         process.nextTick ->
             callback null if callback?
@@ -89,11 +83,10 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    del: (request, user, name, key, callback) ->
-        storage = @_storages[":#{name}"] || {}
+    del: (tx, user, name, key, callback) ->
+        storage = @_getStorage tx, user, name
 
         delete storage[":#{key}"]
-        @_store name, storage
 
         process.nextTick ->
             callback null if callback?
@@ -101,8 +94,9 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    clear: (request, user, name, callback) ->
-        @_delete name
+    clear: (tx, user, name, callback) ->
+        uStorage = @_storages[":#{user}"]
+        delete uStorage[":#{name}"] if uStorage?
 
         process.nextTick ->
             callback null if callback?
@@ -110,17 +104,14 @@ exports.storageManager = class StorageManagerGlobal
         return null
 
     #---------------------------------------------------------------------------
-    _delete: (name) ->
-        delete @_storages[":#{name}"]
+    _getStorage: (tx, user, name) ->
+        @_storages[":#{user}"] = {} unless @_storages[":#{user}"]?
+        uStorage = @_storages[":#{user}"]
 
-    #---------------------------------------------------------------------------
-    _store: (name, storage) ->
-        @_storages[":#{name}"] = storage
+        uStorage[":#{name}"] = {} unless uStorage[":#{name}"]?
+        storage = uStorage[":#{name}"]
 
-    #---------------------------------------------------------------------------
-    _dumpStorages: (title) ->
-        console.log "dumpStorages: #{title}"
-        console.log @_storages
+        return storage
 
 #-------------------------------------------------------------------------------
 # Copyright 2013 Patrick Mueller
