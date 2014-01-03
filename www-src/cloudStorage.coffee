@@ -3,8 +3,8 @@
 Q = require "q"
 _ = require "underscore"
 
-pkg     = require "./package.json"
-builtOn = require "./builtOn.json"
+pkg     = require "../package.json"
+builtOn = require "../lib/builtOn.json"
 
 domStorage    = require "./domStorage"
 remoteStorage = require "./remoteStorage"
@@ -178,8 +178,15 @@ getCallbackAndResult = (callback) ->
 #-------------------------------------------------------------------------------
 normalizeTokens = (object, callback) ->
     for own key, val of object
-        val = "" unless val?
-        err = "invalid #{key}: #{val}" if val.match /^\.+$/
+
+        err = null
+        if key is "userid"
+            val = "" unless val?
+
+        err = "invalid #{key}: null" unless val?
+
+        if val? and val.match /^\.+$/
+            err = "invalid #{key}: #{val}" 
 
         if err?
             callback getInvalidParameterError err

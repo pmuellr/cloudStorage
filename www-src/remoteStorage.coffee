@@ -25,6 +25,8 @@ exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     getStorageNames: (userid, callback) ->
+        return unless checkUserid userid, callback
+
         @_xhr "GET", "/u/#{userid}/s", null, (err, response) ->
             return callback err if err?
 
@@ -34,6 +36,8 @@ exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     keys: (userid, name, callback) ->
+        return unless checkUserid userid, callback
+
         @_xhr "GET", "/u/#{userid}/s/#{name}", null, (err, response) ->
             return callback err if err?
 
@@ -43,6 +47,8 @@ exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     get: (userid, name, key, callback) ->
+        return unless checkUserid userid, callback
+
         @_xhr "GET", "/u/#{userid}/s/#{name}/#{key}", null, (err, response) ->
             return callback err if err?
 
@@ -52,6 +58,8 @@ exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     put: (userid, name, key, value, callback) ->
+        return unless checkUserid userid, callback
+
         @_xhr "PUT", "/u/#{userid}/s/#{name}/#{key}", value, (err, response) ->
             return callback err if err?
 
@@ -61,6 +69,8 @@ exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     del: (userid, name, key, callback) ->
+        return unless checkUserid userid, callback
+
         @_xhr "DELETE", "/u/#{userid}/s/#{name}/#{key}", null, (err, response) ->
             return callback err if err?
 
@@ -70,6 +80,8 @@ exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     clear: (userid, name, callback) ->
+        return unless checkUserid userid, callback
+
         @_xhr "DELETE", "/u/#{userid}/s/#{name}", null, (err, response) ->
             return callback err if err?
 
@@ -79,7 +91,6 @@ exports.StorageDriver = class ReemoteStorageDriver
 
     #---------------------------------------------------------------------------
     _xhr: (method, uri, requestBody, callback) ->
-
         url = path.join @_url, uri
 
         xhr = new XMLHttpRequest
@@ -123,6 +134,14 @@ exports.StorageDriver = class ReemoteStorageDriver
         callback null, response
 
 #-------------------------------------------------------------------------------
+checkUserid = (userid, callback) ->
+    return true unless userid is ""
+
+    err = getInvalidParameterError "invalid userid: ''"
+    process.nextTick -> callback err
+    return false
+
+#-------------------------------------------------------------------------------
 getServerError = (message) ->
     err = new Error message
     err.name = "CloudStorage.ServerError"
@@ -133,6 +152,13 @@ getServerError = (message) ->
 getInvalidJSONError = (message) ->
     err = new Error message
     err.name = "CloudStorage.InvalidJSON"
+
+    err
+
+#-------------------------------------------------------------------------------
+getInvalidParameterError = (message) ->
+    err = new Error message
+    err.name = "CloudStorage.InvalidParameter"
 
     err
 

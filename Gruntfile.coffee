@@ -102,7 +102,7 @@ build = (task) ->
 
     cleanDir "lib"
 
-    coffeec "--output lib lib-src/*.coffee"
+    coffeec "--map --output lib lib-src/*.coffee"
     createBuiltOn "lib/builtOn.json"
 
     #----------------------------------
@@ -111,16 +111,14 @@ build = (task) ->
     cleanDir "www"
     cleanDir "tmp/www"
 
-    coffeec "--output tmp/www www-src/*.coffee"
-    cp "lib/builtOn.json", "tmp/www"
-    cp "package.json",     "tmp/www"
+    coffeec "--output tmp www-src/*.coffee"
 
-    args = "--debug --outfile www/cloudstorage-browser.js --entry tmp/www/cloudStorage.js"
+    args = "--debug --extension .coffee --transform coffeeify --outfile tmp/cloudstorage-browser.js --entry www-src/cloudStorage.coffee"
 
     log "browserify #{args}"
     browserify args
 
-    coffee "tools/split-sourcemap-data-url.coffee www/cloudstorage-browser.js"
+    catSourceMap "--fixFileNames tmp/cloudStorage-browser.js www/cloudStorage-browser.js"
 
     #----------------------------------
     log "building test code in www-test"
@@ -197,9 +195,10 @@ serverKill = (pidFile) ->
 
 #-------------------------------------------------------------------------------
 
-coffee     = (parms) ->  exec "node_modules/.bin/coffee #{parms}"
-coffeec    = (parms) ->  coffee "--bare --compile #{parms}"
-browserify = (parms) ->  exec "node_modules/.bin/browserify #{parms}"
+coffee       = (parms) ->  exec "node_modules/.bin/coffee #{parms}"
+coffeec      = (parms) ->  coffee "--bare --compile #{parms}"
+browserify   = (parms) ->  exec "node_modules/.bin/browserify #{parms}"
+catSourceMap = (parms) ->  exec "node_modules/.bin/cat-source-map #{parms}"
 
 #-------------------------------------------------------------------------------
 log = (message) ->
